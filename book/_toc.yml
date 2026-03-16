@@ -11,3 +11,6 @@ parts:
     chapters:
     - file: preliminaries/firstmodels.md
     - file: preliminaries/probability_theory.ipynb
+    - file: preliminaries/graph_models.ipynb
+    - file: preliminaries/bayes_theorem.ipynb
+    - file: preliminaries/gaussian_distribution.ipynb
