@@ -13,4 +13,4 @@ parts:
     - file: preliminaries/gaussian_distribution.ipynb
   - caption: Frequentist Regression
     chapters:
-    - file: frequentist/knn.html
+    - file: frequentist/knn.ipynb
