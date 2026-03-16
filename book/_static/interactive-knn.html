@@ -1,0 +1,637 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>kNN Regression – D3 Interactive</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .knn-container {
+      margin: 0 auto 40px;
+      max-width: 900px;
+      position: relative; /* for overlay positioning */
+    }
+    .knn-title {
+      font-weight: 600;
+      margin-bottom: 6px;
+      text-align: center;
+    }
+    .knn-subtitle {
+      font-size: 0.9rem;
+      color: #555;
+      margin-bottom: 6px;
+      text-align: center;
+    }
+    .knn-controls {
+      margin: 6px auto 10px;
+      max-width: 550px;          /* match main plot width */
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+    }
+    .knn-controls input[type="range"] {
+      flex: 1;
+    }
+    .knn-wrapper {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;         /* keep sidebar to the right on desktop */
+      gap: 20px;
+      align-items: flex-start;
+      justify-content: center;
+    }
+    .knn-main-svg {
+      border: 1px solid #ddd;
+      background: #fafafa;
+      flex-shrink: 0;
+    }
+    .knn-mse-svg {
+      border: 1px solid #ddd;
+      background: #fcfcfc;
+      flex-shrink: 0;
+    }
+    .legend {
+      font-size: 0.8rem;
+    }
+
+    /* Overlay for hiding plots 2 and 3 initially */
+    .knn-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 10;
+      cursor: pointer;
+      font-weight: 600;
+      color: #333;
+      text-align: center;
+      padding: 10px;
+    }
+
+    /* Mobile: stack sidebar under main plot and make them full-width */
+    @media (max-width: 768px) {
+      .knn-wrapper {
+        flex-direction: column;
+        align-items: center;
+      }
+      .knn-main-svg,
+      .knn-mse-svg {
+        width: 100% !important;
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div id="knn-plot1" class="knn-container"></div>
+<div id="knn-plot2" class="knn-container"></div>
+<div id="knn-plot3" class="knn-container"></div>
+
+<script>
+// ---------- Math / RNG / data helpers ----------
+
+// True function: f_truth(x, freq) = sin(freq * x) + x
+function fTruth(x, freq = 3.0) {
+  return Math.sin(x * freq) + x;
+}
+
+// Seeded RNG (Mulberry32)
+function mulberry32(a) {
+  return function() {
+    let t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Gaussian noise via Box–Muller using a given RNG
+function randnFromRng(rng) {
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+
+// Unseeded Gaussian noise (fallback)
+function randn() {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+
+// Generate data like f_data(epsilon, N), with optional seed for noise
+function generateData(
+  N = 100,
+  epsilon = 1.0,
+  freq = 3.0,
+  xmin = 0,
+  xmax = 2 * Math.PI,
+  seed = null
+) {
+  const x = d3.range(N).map(i =>
+    xmin + (xmax - xmin) * i / (N - 1)
+  );
+
+  let noiseFn;
+  if (seed != null) {
+    const rng = mulberry32(seed >>> 0);
+    noiseFn = () => randnFromRng(rng);
+  } else {
+    noiseFn = randn;
+  }
+
+  const t = x.map(xi => fTruth(xi, freq) + noiseFn() * epsilon);
+  return { x, t, xmin, xmax };
+}
+
+// Simple 1D kNN regressor
+function knnPredict(xTrain, yTrain, xQuery, k) {
+  return xQuery.map(xq => {
+    const distances = xTrain.map((xi, idx) => ({
+      idx,
+      dist: Math.abs(xq - xi)
+    }));
+    distances.sort((a, b) => a.dist - b.dist);
+    let sum = 0;
+    for (let i = 0; i < k; i++) {
+      sum += yTrain[distances[i].idx];
+    }
+    return sum / k;
+  });
+}
+
+// Mean squared error
+function mse(yTrue, yPred) {
+  if (!yTrue || !yPred || yTrue.length === 0) return 0;
+  let s = 0;
+  for (let i = 0; i < yTrue.length; i++) {
+    const d = yTrue[i] - yPred[i];
+    s += d * d;
+  }
+  return s / yTrue.length;
+}
+
+// Unseeded shuffle (used if no seed requested)
+function shuffle(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+// Seeded shuffle for validation split
+function seededShuffle(array, seed) {
+  const rng = mulberry32(seed >>> 0);
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+// ---------- Reusable kNN interactive plot ----------
+
+class KnnInteractivePlot {
+  constructor(containerSelector, options = {}) {
+    this.options = Object.assign({
+      title: "",
+      subtitle: "",
+      showTruth: true,
+      showSidebar: false,
+      N: 100,
+      epsilon: 1.0,
+      freq: 3.0,
+      valPct: 0,           // 0% for plots 1 & 2, 20% for plot 3
+      kMin: 1,
+      kMax: 50,
+      kInit: 1,
+      width: 550,
+      height: 300,
+      mseHeight: 300,      // same height as main plot
+      dataSeed: null,      // seed for generating observations
+      seed: null           // seed for validation split
+    }, options);
+
+    this.container = d3.select(containerSelector);
+    this.k = this.options.kInit;
+
+    this.initLayout();
+    this.initData();
+    this.initScalesAndAxes();
+    this.initMainPlot();
+    if (this.options.showSidebar) {
+      this.initMsePlot();
+    }
+    this.update(); // initial render
+  }
+
+  initLayout() {
+    const { title, subtitle, kMin, kMax, kInit } = this.options;
+
+    // Title + explainer
+    if (title) {
+      this.container.append("div")
+        .attr("class", "knn-title")
+        .text(title);
+    }
+    if (subtitle) {
+      this.container.append("div")
+        .attr("class", "knn-subtitle")
+        .text(subtitle);
+    }
+
+    // Slider for k
+    const controls = this.container.append("div")
+      .attr("class", "knn-controls");
+
+    controls.append("span").text("Neighbors (k):");
+
+    this.slider = controls.append("input")
+      .attr("type", "range")
+      .attr("min", kMin)
+      .attr("max", kMax)
+      .attr("step", 1)
+      .attr("value", kInit);
+
+    this.sliderValue = controls.append("span")
+      .text(kInit);
+
+    this.slider.on("input", (event) => {
+      this.k = +event.target.value;
+      this.sliderValue.text(this.k);
+      this.update();
+    });
+
+    // Wrapper for main plot (+ optional sidebar)
+    this.wrapper = this.container.append("div")
+      .attr("class", "knn-wrapper");
+  }
+
+  initData() {
+    const { N, epsilon, freq, valPct, seed, dataSeed } = this.options;
+
+    // Seeded data generation: same observations every time
+    const data = generateData(N, epsilon, freq, 0, 2 * Math.PI, dataSeed);
+    this.x = data.x;
+    this.t = data.t;
+    this.xmin = data.xmin;
+    this.xmax = data.xmax;
+    this.freq = freq;
+
+    // Dense prediction grid
+    this.xPred = d3.range(0, 1000).map(i =>
+      this.xmin + (this.xmax - this.xmin) * i / 999
+    );
+    this.yTruthPred = this.xPred.map(x => fTruth(x, this.freq));
+
+    // Split into train/validation
+    if (valPct > 0) {
+      let indices = d3.range(this.x.length);
+      if (seed != null) {
+        indices = seededShuffle(indices, seed);   // seeded split
+      } else {
+        indices = shuffle(indices);
+      }
+      const nTrain = Math.ceil(this.x.length * (1 - valPct / 100));
+      const trainIdx = indices.slice(0, nTrain);
+      const valIdx = indices.slice(nTrain);
+
+      this.xTrain = trainIdx.map(i => this.x[i]);
+      this.yTrain = trainIdx.map(i => this.t[i]);
+      this.xVal = valIdx.map(i => this.x[i]);
+      this.yVal = valIdx.map(i => this.t[i]);
+    } else {
+      this.xTrain = this.x.slice();
+      this.yTrain = this.t.slice();
+      this.xVal = [];
+      this.yVal = [];
+    }
+
+    // y limits based on noisy data
+    const yMin = d3.min(this.t);
+    const yMax = d3.max(this.t);
+    const yRange = yMax - yMin;
+    this.yDomain = [yMin - 0.1 * yRange, yMax + 0.1 * yRange];
+  }
+
+  initScalesAndAxes() {
+    const { width, height } = this.options;
+
+    this.margin = { top: 20, right: 20, bottom: 40, left: 50 };
+    this.innerWidth = width - this.margin.left - this.margin.right;
+    this.innerHeight = height - this.margin.top - this.margin.bottom;
+
+    this.svg = this.wrapper.append("svg")
+      .attr("class", "knn-main-svg")
+      .attr("width", width)
+      .attr("height", height);
+
+    this.mainG = this.svg.append("g")
+      .attr("transform", `translate(${this.margin.left},${this.margin.top})`);
+
+    // Scales
+    this.xScale = d3.scaleLinear()
+      .domain([this.xmin, this.xmax])
+      .range([0, this.innerWidth]);
+
+    this.yScale = d3.scaleLinear()
+      .domain(this.yDomain)
+      .range([this.innerHeight, 0]);
+
+    // Axes
+    this.mainG.append("g")
+      .attr("transform", `translate(0,${this.innerHeight})`)
+      .call(d3.axisBottom(this.xScale));
+
+    this.mainG.append("g")
+      .call(d3.axisLeft(this.yScale));
+
+    // Axis labels
+    this.mainG.append("text")
+      .attr("x", this.innerWidth / 2)
+      .attr("y", this.innerHeight + 32)
+      .attr("text-anchor", "middle")
+      .text("x");
+
+    this.mainG.append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("x", -this.innerHeight / 2)
+      .attr("y", -38)
+      .attr("text-anchor", "middle")
+      .text("t");
+  }
+
+  initMainPlot() {
+    const { showTruth } = this.options;
+
+    // Line generators
+    this.linePred = d3.line()
+      .x(d => this.xScale(d.x))
+      .y(d => this.yScale(d.y));
+
+    this.lineTruth = d3.line()
+      .x(d => this.xScale(d.x))
+      .y(d => this.yScale(d.y));
+
+    // Prediction line
+    this.predPath = this.mainG.append("path")
+      .attr("fill", "none")
+      .attr("stroke", "#0076C2")
+      .attr("stroke-width", 2);
+
+    // Truth line (optional)
+    if (showTruth) {
+      this.truthPath = this.mainG.append("path")
+        .attr("fill", "none")
+        .attr("stroke", "#333")
+        .attr("stroke-width", 1.5)
+        .attr("stroke-dasharray", "4,4");
+    } else {
+      this.truthPath = null;
+    }
+
+    // Training data points
+    this.trainPoints = this.mainG.append("g")
+      .selectAll("circle.train")
+      .data(d3.range(this.xTrain.length))
+      .join("circle")
+      .attr("class", "train")
+      .attr("r", 3)
+      .attr("fill", "#EC6842")
+      .attr("stroke", "none");
+
+    // Validation data points (if any)
+    this.valPoints = this.mainG.append("g")
+      .selectAll("circle.val")
+      .data(d3.range(this.xVal.length))
+      .join("circle")
+      .attr("class", "val")
+      .attr("r", 3)
+      .attr("fill", "#A50034")
+      .attr("stroke", "none");
+
+    // Legend (top-left now) with dots for data, lines for functions
+    const legend = this.mainG.append("g")
+      .attr("class", "legend")
+      .attr("transform", "translate(10, 10)");
+
+    let offset = 0;
+
+    const addLegendDot = (color, label) => {
+      const g = legend.append("g")
+        .attr("transform", `translate(0,${offset})`);
+      g.append("circle")
+        .attr("cx", 5)
+        .attr("cy", 6)
+        .attr("r", 4)
+        .attr("fill", color);
+      g.append("text")
+        .attr("x", 15)
+        .attr("y", 9)
+        .text(label);
+      offset += 16;
+    };
+
+    const addLegendLine = (color, label, dash) => {
+      const g = legend.append("g")
+        .attr("transform", `translate(0,${offset})`);
+      g.append("line")
+        .attr("x1", 0)
+        .attr("x2", 20)
+        .attr("y1", 6)
+        .attr("y2", 6)
+        .attr("stroke", color)
+        .attr("stroke-width", 2)
+        .attr("stroke-dasharray", dash || null);
+      g.append("text")
+        .attr("x", 26)
+        .attr("y", 9)
+        .text(label);
+      offset += 16;
+    };
+
+    addLegendDot("#EC6842", "Training data");
+    if (this.xVal.length > 0) {
+      addLegendDot("#A50034", "Validation data");
+    }
+    addLegendLine("#0076C2", "kNN prediction");
+    if (this.options.showTruth) {
+      addLegendLine("#333", "Ground truth", "4,4");
+    }
+  }
+
+  initMsePlot() {
+    const { mseHeight } = this.options;
+
+    const margin = { top: 20, right: 20, bottom: 45, left: 50 };
+    const width = 260;                 // narrower sidebar
+    const height = mseHeight;          // same height as main plot
+    this.mseMargin = margin;
+    this.mseWidth = width - margin.left - margin.right;
+    this.mseHeightInner = height - margin.top - margin.bottom;
+
+    this.mseSvg = this.wrapper.append("svg")
+      .attr("class", "knn-mse-svg")
+      .attr("width", width)
+      .attr("height", height);
+
+    this.mseG = this.mseSvg.append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const categories = ["Training", "Validation"];
+    this.mseX = d3.scaleBand()
+      .domain(categories)
+      .range([0, this.mseWidth])
+      .padding(0.4);
+
+    this.mseY = d3.scaleLinear()
+      .domain([0, 2.0])
+      .range([this.mseHeightInner, 0]);
+
+    this.mseG.append("g")
+      .attr("transform", `translate(0,${this.mseHeightInner})`)
+      .call(d3.axisBottom(this.mseX));
+
+    this.mseG.append("g")
+      .call(d3.axisLeft(this.mseY).ticks(5));
+
+    this.mseG.append("text")
+      .attr("x", this.mseWidth / 2)
+      .attr("y", this.mseHeightInner + 34)
+      .attr("text-anchor", "middle")
+      .text("Dataset");
+
+    this.mseG.append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("x", -this.mseHeightInner / 2)
+      .attr("y", -38)
+      .attr("text-anchor", "middle")
+      .text("MSE");
+
+    // Points for training / validation
+    this.mseTrainPoint = this.mseG.append("circle")
+      .attr("r", 5)
+      .attr("fill", "#EC6842");
+
+    this.mseValPoint = this.mseG.append("circle")
+      .attr("r", 5)
+      .attr("fill", "#A50034")
+      .style("display", this.xVal.length > 0 ? null : "none");
+  }
+
+  update() {
+    // Compute prediction on dense grid
+    const yPredDense = knnPredict(this.xTrain, this.yTrain, this.xPred, this.k);
+
+    // Update prediction line
+    this.predPath.datum(this.xPred.map((x, i) => ({ x, y: yPredDense[i] })))
+      .attr("d", this.linePred);
+
+    // Update truth line (if visible)
+    if (this.truthPath) {
+      this.truthPath.datum(this.xPred.map((x, i) => ({ x, y: this.yTruthPred[i] })))
+        .attr("d", this.lineTruth);
+    }
+
+    // Update training points
+    this.trainPoints
+      .attr("cx", i => this.xScale(this.xTrain[i]))
+      .attr("cy", i => this.yScale(this.yTrain[i]));
+
+    // Update validation points
+    this.valPoints
+      .attr("cx", i => this.xScale(this.xVal[i]))
+      .attr("cy", i => this.yScale(this.yVal[i]));
+
+    // Update sidebar MSE plot if present
+    if (this.options.showSidebar && this.mseG) {
+      const trainPred = knnPredict(this.xTrain, this.yTrain, this.xTrain, this.k);
+      const trainMse = mse(this.yTrain, trainPred);
+
+      this.mseTrainPoint
+        .attr("cx", this.mseX("Training") + this.mseX.bandwidth() / 2)
+        .attr("cy", this.mseY(trainMse));
+
+      if (this.xVal.length > 0) {
+        const valPred = knnPredict(this.xTrain, this.yTrain, this.xVal, this.k);
+        const valMse = mse(this.yVal, valPred);
+
+        this.mseValPoint
+          .style("display", null)
+          .attr("cx", this.mseX("Validation") + this.mseX.bandwidth() / 2)
+          .attr("cy", this.mseY(valMse));
+      } else {
+        this.mseValPoint.style("display", "none");
+      }
+    }
+  }
+}
+
+// ---------- Reveal overlay helper (for plots 2 & 3) ----------
+
+function addRevealOverlay(containerSelector, label) {
+  const container = d3.select(containerSelector);
+  const overlay = container.append("div")
+    .attr("class", "knn-overlay")
+    .text(label || "Click to reveal plot");
+  overlay.on("click", () => {
+    overlay.style("display", "none");
+  });
+}
+
+// ---------- Instantiate the three teaching plots ----------
+
+// Use same dataSeed everywhere so all three panels share the same data
+const DATA_SEED = 1234;
+
+// Plot 1: Data + kNN prediction, *no* ground truth
+new KnnInteractivePlot("#knn-plot1", {
+  title: "Training a first model",
+  subtitle: "Adjust k based only on the patterns you can discern by looking at the data.",
+  showTruth: false,
+  showSidebar: false,
+  kInit: 50,
+  valPct: 0,
+  dataSeed: DATA_SEED
+});
+
+// Plot 2: Data + kNN prediction + ground truth
+new KnnInteractivePlot("#knn-plot2", {
+  title: "Training a model while knowing the ground truth",
+  subtitle: "Now the exact f(x) is shown. Does your choice of k change?",
+  showTruth: true,
+  showSidebar: false,
+  kInit: 1,
+  valPct: 0,
+  dataSeed: DATA_SEED
+});
+
+// Plot 3: Data + kNN prediction, validation split + MSE panel (sidebar right)
+new KnnInteractivePlot("#knn-plot3", {
+  title: "Training a good model under limited knowledge",
+  subtitle: "Now a more realistic situation, no ground truth but a validation set can guide you.",
+  showTruth: false,
+  showSidebar: true,
+  kInit: 1,
+  valPct: 20,   // 20% validation
+  dataSeed: DATA_SEED,
+  seed: 42      // fixed seed for validation split
+});
+
+// Add overlays to plots 2 and 3 so students reveal them one by one
+addRevealOverlay("#knn-plot2", "Click to reveal Plot 2");
+addRevealOverlay("#knn-plot3", "Click to reveal Plot 3");
+
+</script>
+</body>
+</html>
