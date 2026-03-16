@@ -10,3 +10,4 @@ parts:
     restart_numbering: false        # Default value (line can be removed), whether to restart numbering for this part, configuration part of TeachBooks' version of sphinx-external-toc (https://github.com/TeachBooks/sphinx-external-toc?tab=readme-ov-file#toc-tree-options)
     chapters:
     - file: preliminaries/firstmodels.md
+    - file: preliminaries/probability_theory.ipynb
