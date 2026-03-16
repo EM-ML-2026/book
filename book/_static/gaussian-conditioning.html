@@ -3,333 +3,336 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gaussian Conditioning</title>
+  <title></title>
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <style>
-    :root {
-      --bg: #ffffff;
-      --fg: #1f2937;
-      --muted: #6b7280;
-      --grid: #e5e7eb;
-      --accent: #ec6842;
-      --line: #0f172a;
-      --border: #d1d5db;
-    }
     body {
-      margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--bg);
-      color: var(--fg);
+      font-family: sans-serif;
+      margin: 16px;
+      color: #222;
+      background: #fff;
     }
-    .wrap {
-      max-width: 980px;
-      margin: 0 auto;
-      padding: 14px 16px 18px;
-      box-sizing: border-box;
-    }
-    .title {
-      font-size: 18px;
-      font-weight: 600;
-      margin: 0 0 10px;
-    }
-    .subtitle {
-      color: var(--muted);
-      font-size: 13px;
-      margin: 0 0 12px;
+    .container {
+      width: 980px;
+      max-width: 100%;
     }
     svg {
-      width: 100%;
-      height: auto;
-      display: block;
       overflow: visible;
+      display: block;
     }
     .axis path, .axis line {
-      stroke: #6b7280;
+      stroke: #666;
+      shape-rendering: crispEdges;
     }
     .axis text {
-      fill: #374151;
+      fill: #444;
       font-size: 12px;
     }
-    .grid line {
-      stroke: var(--grid);
-      stroke-opacity: 0.85;
-    }
-    .grid path {
-      display: none;
-    }
-    .slider-panel {
-      margin-top: 10px;
-      display: grid;
-      gap: 10px;
+    .joint-label, .panel-label {
+      font-size: 14px;
     }
     .slider-row {
       display: grid;
-      grid-template-columns: 120px 1fr 56px;
-      align-items: center;
+      grid-template-columns: 100px 1fr 56px;
       gap: 10px;
+      align-items: center;
+      margin: 8px 0;
+      width: 760px;
+      max-width: 100%;
     }
     .slider-row label {
       font-size: 14px;
     }
     .slider-row input[type="range"] {
       width: 100%;
-      accent-color: var(--accent);
     }
-    .slider-value {
-      text-align: right;
-      color: var(--muted);
+    .value {
       font-variant-numeric: tabular-nums;
-      font-size: 13px;
+      text-align: right;
+      color: #444;
     }
-    .formula {
-      margin-top: 12px;
-      color: var(--muted);
+    .contour {
+      stroke: none;
+    }
+    .vline {
+      stroke: #1f77b4;
+      stroke-width: 2;
+    }
+    .curve {
+      fill: none;
+      stroke: #ff7f0e;
+      stroke-width: 2;
+    }
+    .title {
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+    .note {
+      color: #666;
       font-size: 12px;
-    }
-    .cov-readout {
       margin-top: 6px;
-      color: var(--muted);
-      font-size: 12px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      white-space: pre-wrap;
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
+  <div class="container">
     <div class="title">Gaussian Conditioning</div>
-    <div class="subtitle">D3 recreation of the interactive matplotlib widget for a 2D Gaussian with marginal and conditional densities.</div>
-    <svg id="chart" viewBox="0 0 920 620" aria-label="Gaussian conditioning interactive plot"></svg>
-
-    <div class="slider-panel">
-      <div class="slider-row">
-        <label for="xb">x_b</label>
-        <input id="xb" type="range" min="-4.52274844" max="3.47725156" step="0.01" value="-0.32542284" />
-        <div class="slider-value" id="xb-val"></div>
-      </div>
-      <div class="slider-row">
-        <label for="saa">Σ_aa</label>
-        <input id="saa" type="range" min="0.3" max="2.0" step="0.01" value="0.77545885" />
-        <div class="slider-value" id="saa-val"></div>
-      </div>
-      <div class="slider-row">
-        <label for="sbb">Σ_bb</label>
-        <input id="sbb" type="range" min="0.3" max="2.0" step="0.01" value="0.50362894" />
-        <div class="slider-value" id="sbb-val"></div>
-      </div>
-      <div class="slider-row">
-        <label for="rho">ρ_ab</label>
-        <input id="rho" type="range" min="-0.95" max="0.95" step="0.01" value="-0.4309" />
-        <div class="slider-value" id="rho-val"></div>
-      </div>
-    </div>
-
-    <div class="formula">Uses μ = [0.1891, -0.5227] and updates Σ<sub>ab</sub> = ρ√(Σ<sub>aa</sub>Σ<sub>bb</sub>) with p(x<sub>a</sub>|x<sub>b</sub>) computed analytically.</div>
-    <div class="cov-readout" id="cov-readout"></div>
+    <div id="plot"></div>
+    <div id="controls"></div>
   </div>
 
   <script>
-    const muA = 0.18905338;
-    const muB = -0.52274844;
-    const n = 100;
-
-    const xbDomain = [muB - 4, muB + 4];
-    const xaDomain = [muA - 4, muA + 4];
-
-    const svg = d3.select('#chart');
-    const W = 920, H = 620;
-
-    const leftMargW = 130;
-    const centerW = 430;
-    const rightCondW = 130;
-    const gap = 34;
-    const plotH = 420;
-    const top = 40;
-    const left = 120;
-    const mainX = left + leftMargW + gap;
-    const mainY = top;
-    const rightX = mainX + centerW + gap;
-
-    const xScale = d3.scaleLinear().domain(xbDomain).range([mainX, mainX + centerW]);
-    const yScale = d3.scaleLinear().domain(xaDomain).range([mainY + plotH, mainY]);
-    const margScale = d3.scaleLinear().domain([1.5, 0]).range([left, left + leftMargW]);
-    const condScale = d3.scaleLinear().domain([0, 1.0]).range([rightX, rightX + rightCondW]);
-
-    const xTicks = d3.axisBottom(xScale).ticks(6);
-    const yTicks = d3.axisLeft(yScale).ticks(6);
-    const yTicksRight = d3.axisRight(yScale).tickValues([]);
-
-    const main = svg.append('g');
-
-    main.append('g')
-      .attr('class', 'grid')
-      .attr('transform', `translate(0,${mainY + plotH})`)
-      .call(d3.axisBottom(xScale).ticks(6).tickSize(-plotH).tickFormat(''));
-
-    main.append('g')
-      .attr('class', 'grid')
-      .attr('transform', `translate(${mainX},0)`)
-      .call(d3.axisLeft(yScale).ticks(6).tickSize(-centerW).tickFormat(''));
-
-    main.append('g').attr('class', 'axis').attr('transform', `translate(0,${mainY + plotH})`).call(xTicks);
-    main.append('g').attr('class', 'axis').attr('transform', `translate(${mainX},0)`).call(yTicks);
-    main.append('g').attr('class', 'axis').attr('transform', `translate(${mainX + centerW},0)`).call(yTicksRight);
-
-    main.append('text')
-      .attr('x', mainX + centerW / 2)
-      .attr('y', mainY + plotH + 40)
-      .attr('text-anchor', 'middle')
-      .style('font-size', '14px')
-      .text('x_b');
-
-    main.append('text')
-      .attr('x', left + 14)
-      .attr('y', mainY + plotH / 2)
-      .attr('transform', `rotate(-90, ${left + 14}, ${mainY + plotH / 2})`)
-      .attr('text-anchor', 'middle')
-      .style('font-size', '14px')
-      .text('x_a');
-
-    main.append('text')
-      .attr('x', left + leftMargW / 2)
-      .attr('y', mainY + plotH + 40)
-      .attr('text-anchor', 'middle')
-      .style('font-size', '14px')
-      .text('p(x_a)');
-
-    main.append('text')
-      .attr('x', rightX + rightCondW / 2)
-      .attr('y', mainY + plotH + 40)
-      .attr('text-anchor', 'middle')
-      .style('font-size', '14px')
-      .text('p(x_a | x_b)');
-
-    const contourGroup = main.append('g');
-    const vline = main.append('line')
-      .attr('y1', mainY)
-      .attr('y2', mainY + plotH)
-      .attr('stroke', '#111827')
-      .attr('stroke-width', 1.5);
-
-    const margPath = main.append('path')
-      .attr('fill', 'none')
-      .attr('stroke', '#ec6842')
-      .attr('stroke-width', 2.3);
-
-    const condPath = main.append('path')
-      .attr('fill', 'none')
-      .attr('stroke', '#ec6842')
-      .attr('stroke-width', 2.3);
-
-    const margAxis = main.append('g')
-      .attr('class', 'axis')
-      .attr('transform', `translate(0,${mainY + plotH})`)
-      .call(d3.axisBottom(margScale).tickValues([1.5, 1.0, 0.5, 0]).tickFormat(d3.format('.1f')));
-
-    const condAxis = main.append('g')
-      .attr('class', 'axis')
-      .attr('transform', `translate(0,${mainY + plotH})`)
-      .call(d3.axisBottom(condScale).tickValues([0, 0.5, 1.0]).tickFormat(d3.format('.1f')));
-
-    main.append('g').attr('class', 'axis').attr('transform', `translate(${left + leftMargW},0)`).call(d3.axisRight(yScale).tickValues([]));
-    main.append('g').attr('class', 'axis').attr('transform', `translate(${rightX},0)`).call(d3.axisLeft(yScale).tickValues([]));
-
-    const xbInput = document.getElementById('xb');
-    const saaInput = document.getElementById('saa');
-    const sbbInput = document.getElementById('sbb');
-    const rhoInput = document.getElementById('rho');
-
-    const fmt = d3.format('.2f');
-    const fmt4 = d3.format('.4f');
-    const color = d3.scaleSequential(d3.interpolateTurbo);
-
-    function normalPdf(x, mu, variance) {
-      return (1 / Math.sqrt(2 * Math.PI * variance)) * Math.exp(-0.5 * ((x - mu) ** 2) / variance);
-    }
-
-    function bivariatePdf(xa, xb, saa, sbb, sab) {
-      const da = xa - muA;
-      const db = xb - muB;
-      const det = saa * sbb - sab * sab;
-      const inv00 = sbb / det;
-      const inv01 = -sab / det;
-      const inv11 = saa / det;
-      const quad = da * da * inv00 + 2 * da * db * inv01 + db * db * inv11;
-      return Math.exp(-0.5 * quad) / (2 * Math.PI * Math.sqrt(det));
-    }
-
-    function update() {
-      const xb = +xbInput.value;
-      const saa = +saaInput.value;
-      const sbb = +sbbInput.value;
-      const rho = +rhoInput.value;
-      const sab = rho * Math.sqrt(saa * sbb);
-      const det = saa * sbb - sab * sab;
-
-      document.getElementById('xb-val').textContent = fmt(xb);
-      document.getElementById('saa-val').textContent = fmt(saa);
-      document.getElementById('sbb-val').textContent = fmt(sbb);
-      document.getElementById('rho-val').textContent = fmt(rho);
-      document.getElementById('cov-readout').textContent = `Σ = [[${fmt4(saa)}, ${fmt4(sab)}],\n     [${fmt4(sab)}, ${fmt4(sbb)}]]\nμ_cond = ${fmt4(muA + (sab / sbb) * (xb - muB))},  Σ_cond = ${fmt4(saa - (sab * sab) / sbb)}`;
-
-      const xVals = d3.range(n).map(i => xaDomain[0] + (i / (n - 1)) * (xaDomain[1] - xaDomain[0]));
-      const yValsDesc = d3.range(n).map(j => xaDomain[1] - (j / (n - 1)) * (xaDomain[1] - xaDomain[0]));
-      const xbVals = d3.range(n).map(i => xbDomain[0] + (i / (n - 1)) * (xbDomain[1] - xbDomain[0]));
-
-      const gridValues = [];
-      let minV = Infinity, maxV = -Infinity;
-      for (let j = 0; j < n; j++) {
-        for (let i = 0; i < n; i++) {
-          const val = bivariatePdf(yValsDesc[j], xbVals[i], saa, sbb, sab);
-          gridValues.push(val);
-          if (val < minV) minV = val;
-          if (val > maxV) maxV = val;
-        }
+    (() => {
+      const d3v = window.d3;
+      if (!d3v) {
+        document.getElementById('plot').innerHTML = '<p style="color:#b00020">D3 failed to load from CDN.</p>';
+        return;
       }
 
-      const levels = d3.range(1, 15).map(k => minV + (k / 15) * (maxV - minV));
-      color.domain([levels[0], levels[levels.length - 1]]);
+      // --- Parameters matching the notebook widget ---
+      const mu = [0, 0];
+      const lims = [[-4, 4], [-4, 4]]; // x_a on vertical axis, x_b on horizontal axis
+      const gridN = 120;
+      const contourLevels = 14;
 
-      const contours = d3.contours().size([n, n]).thresholds(levels)(gridValues);
-      const path = d3.geoPath(d3.geoIdentity().scale(1));
+      const state = {
+        x_b: 0.0,
+        sigma_aa: 1.0,
+        sigma_bb: 1.0,
+        rho: 0.0
+      };
 
-      const sel = contourGroup.selectAll('path').data(contours, d => d.value);
-      sel.join(
-        enter => enter.append('path')
-          .attr('stroke', 'none')
-          .attr('opacity', 0.96)
-          .attr('transform', `translate(${mainX},${mainY}) scale(${centerW / (n - 1)}, ${plotH / (n - 1)})`)
-          .attr('d', path)
-          .attr('fill', d => color(d.value)),
-        update => update
-          .attr('transform', `translate(${mainX},${mainY}) scale(${centerW / (n - 1)}, ${plotH / (n - 1)})`)
-          .attr('d', path)
-          .attr('fill', d => color(d.value)),
-        exit => exit.remove()
-      );
+      // --- Layout ---
+      const totalWidth = 920;
+      const totalHeight = 620;
+      const mainLeft = 220;
+      const mainTop = 30;
+      const jointSize = 420;
+      const sideWidth = 110;
+      const sideGap = 22;
+      const sliderStartY = 500;
 
-      vline.attr('x1', xScale(xb)).attr('x2', xScale(xb));
+      const svg = d3v.select('#plot')
+        .append('svg')
+        .attr('width', totalWidth)
+        .attr('height', totalHeight)
+        .attr('viewBox', `0 0 ${totalWidth} ${totalHeight}`);
 
-      const muCond = muA + (sab / sbb) * (xb - muB);
-      const varCond = saa - (sab * sab) / sbb;
+      const mainX = d3v.scaleLinear().domain(lims[1]).range([mainLeft, mainLeft + jointSize]);
+      const mainY = d3v.scaleLinear().domain(lims[0]).range([mainTop + jointSize, mainTop]);
 
-      const marginalLine = d3.line()
-        .x(d => margScale(Math.min(1.5, d.p)))
-        .y(d => yScale(d.x));
+      const leftPanelX = d3v.scaleLinear().domain([1.5, -0.1]).range([mainLeft - sideGap - sideWidth, mainLeft - sideGap]);
+      const rightPanelX = d3v.scaleLinear().domain([-0.1, 1.0]).range([mainLeft + jointSize + sideGap, mainLeft + jointSize + sideGap + sideWidth]);
+      const sideY = d3v.scaleLinear().domain(lims[0]).range([mainTop + jointSize, mainTop]);
 
-      const conditionalLine = d3.line()
-        .x(d => condScale(Math.min(1.0, d.p)))
-        .y(d => yScale(d.x));
+      const color = d3v.scaleSequential(d3v.interpolateMagma);
 
-      const margData = xVals.map(x => ({ x, p: normalPdf(x, muA, saa) }));
-      const condData = xVals.map(x => ({ x, p: normalPdf(x, muCond, varCond) }));
+      const jointLayer = svg.append('g');
+      const axesLayer = svg.append('g');
+      const leftLayer = svg.append('g');
+      const rightLayer = svg.append('g');
+      const overlayLayer = svg.append('g');
 
-      margPath.attr('d', marginalLine(margData));
-      condPath.attr('d', conditionalLine(condData));
-    }
+      // Axes
+      axesLayer.append('g')
+        .attr('class', 'axis')
+        .attr('transform', `translate(0, ${mainTop + jointSize})`)
+        .call(d3v.axisBottom(mainX));
 
-    [xbInput, saaInput, sbbInput, rhoInput].forEach(el => el.addEventListener('input', update));
-    update();
+      axesLayer.append('g')
+        .attr('class', 'axis')
+        .attr('transform', `translate(${mainLeft}, 0)`)
+        .call(d3v.axisLeft(mainY).tickFormat(''));
+
+      axesLayer.append('g')
+        .attr('class', 'axis')
+        .attr('transform', `translate(${mainLeft - sideGap}, 0)`)
+        .call(d3v.axisRight(sideY));
+
+      axesLayer.append('g')
+        .attr('class', 'axis')
+        .attr('transform', `translate(${mainLeft + jointSize + sideGap}, 0)`)
+        .call(d3v.axisLeft(sideY).tickFormat(''));
+
+      axesLayer.append('text')
+        .attr('class', 'joint-label')
+        .attr('x', mainLeft + jointSize / 2)
+        .attr('y', mainTop + jointSize + 38)
+        .attr('text-anchor', 'middle')
+        .text('x_b');
+
+      axesLayer.append('text')
+        .attr('class', 'panel-label')
+        .attr('x', mainLeft - sideGap - sideWidth / 2)
+        .attr('y', mainTop + jointSize + 38)
+        .attr('text-anchor', 'middle')
+        .text('p(x_a)');
+
+      axesLayer.append('text')
+        .attr('class', 'panel-label')
+        .attr('x', mainLeft + jointSize + sideGap + sideWidth / 2)
+        .attr('y', mainTop + jointSize + 38)
+        .attr('text-anchor', 'middle')
+        .text('p(x_a | x_b)');
+
+      axesLayer.append('text')
+        .attr('class', 'panel-label')
+        .attr('x', mainLeft - sideGap - sideWidth - 42)
+        .attr('y', mainTop + jointSize / 2)
+        .attr('transform', `rotate(-90, ${mainLeft - sideGap - sideWidth - 42}, ${mainTop + jointSize / 2})`)
+        .attr('text-anchor', 'middle')
+        .text('x_a');
+
+      // Background boxes for panels
+      [
+        [mainLeft, mainTop, jointSize, jointSize],
+        [mainLeft - sideGap - sideWidth, mainTop, sideWidth, jointSize],
+        [mainLeft + jointSize + sideGap, mainTop, sideWidth, jointSize]
+      ].forEach(([x, y, w, h]) => {
+        axesLayer.append('rect')
+          .attr('x', x)
+          .attr('y', y)
+          .attr('width', w)
+          .attr('height', h)
+          .attr('fill', 'none')
+          .attr('stroke', '#999');
+      });
+
+      const verticalLine = overlayLayer.append('line')
+        .attr('class', 'vline')
+        .attr('y1', mainTop)
+        .attr('y2', mainTop + jointSize);
+
+      const margPath = leftLayer.append('path').attr('class', 'curve');
+      const condPath = rightLayer.append('path').attr('class', 'curve');
+
+      function gaussian1D(x, mean, variance) {
+        const sigma = Math.sqrt(Math.max(variance, 1e-12));
+        const z = (x - mean) / sigma;
+        return Math.exp(-0.5 * z * z) / (sigma * Math.sqrt(2 * Math.PI));
+      }
+
+      function covariance() {
+        const cov = state.rho * Math.sqrt(state.sigma_aa * state.sigma_bb);
+        return [
+          [state.sigma_aa, cov],
+          [cov, state.sigma_bb]
+        ];
+      }
+
+      function jointPdf(xa, xb) {
+        const Sigma = covariance();
+        const a = Sigma[0][0], b = Sigma[0][1], d = Sigma[1][1];
+        const det = a * d - b * b;
+        const inv00 = d / det;
+        const inv01 = -b / det;
+        const inv11 = a / det;
+        const da = xa - mu[0];
+        const db = xb - mu[1];
+        const quad = inv00 * da * da + 2 * inv01 * da * db + inv11 * db * db;
+        return Math.exp(-0.5 * quad) / (2 * Math.PI * Math.sqrt(det));
+      }
+
+      function conditionalParams(xb) {
+        const Sigma = covariance();
+        const sigma_ab = Sigma[0][1];
+        const mean = mu[0] + (sigma_ab / Sigma[1][1]) * (xb - mu[1]);
+        const variance = Sigma[0][0] - (sigma_ab * sigma_ab) / Sigma[1][1];
+        return { mean, variance };
+      }
+
+      function buildGridValues() {
+        const values = new Array(gridN * gridN);
+        let vmax = -Infinity;
+        for (let iy = 0; iy < gridN; iy++) {
+          const xa = lims[0][0] + (iy / (gridN - 1)) * (lims[0][1] - lims[0][0]);
+          for (let ix = 0; ix < gridN; ix++) {
+            const xb = lims[1][0] + (ix / (gridN - 1)) * (lims[1][1] - lims[1][0]);
+            const v = jointPdf(xa, xb);
+            values[iy * gridN + ix] = v;
+            if (v > vmax) vmax = v;
+          }
+        }
+        return { values, vmax };
+      }
+
+      function contourThresholds(vmax) {
+        return d3v.range(1, contourLevels + 1).map(i => (i / (contourLevels + 1)) * vmax);
+      }
+
+      function linePath(xs, ys, xScale, yScale) {
+        return d3v.line()
+          .x((d, i) => xScale(xs[i]))
+          .y((d) => yScale(d))(ys);
+      }
+
+      function render() {
+        const { values, vmax } = buildGridValues();
+        const thresholds = contourThresholds(vmax);
+        color.domain([0, thresholds[thresholds.length - 1]]);
+
+        const contours = d3v.contours()
+          .size([gridN, gridN])
+          .thresholds(thresholds)(values);
+
+        const geoPath = d3v.geoPath(
+          d3v.geoIdentity().scale(jointSize / (gridN - 1)).translate([mainLeft, mainTop + jointSize]).reflectY(true)
+        );
+
+        const contourSel = jointLayer.selectAll('path.contour').data(contours, d => d.value);
+        contourSel.join(
+          enter => enter.append('path').attr('class', 'contour'),
+          update => update,
+          exit => exit.remove()
+        )
+          .attr('d', geoPath)
+          .attr('fill', d => color(d.value));
+
+        verticalLine
+          .attr('x1', mainX(state.x_b))
+          .attr('x2', mainX(state.x_b));
+
+        const ys = d3v.range(240).map(i => lims[0][0] + (i / 239) * (lims[0][1] - lims[0][0]));
+        const margXs = ys.map(y => gaussian1D(y, mu[0], state.sigma_aa));
+        const cond = conditionalParams(state.x_b);
+        const condXs = ys.map(y => gaussian1D(y, cond.mean, cond.variance));
+
+        margPath.attr('d', linePath(margXs, ys, leftPanelX, sideY));
+        condPath.attr('d', linePath(condXs, ys, rightPanelX, sideY));
+      }
+
+      // Controls
+      const controls = d3v.select('#controls');
+      const sliderSpecs = [
+        { key: 'x_b', label: 'x_b', min: -4, max: 4, step: 0.01 },
+        { key: 'sigma_aa', label: 'Σ_aa', min: 0.3, max: 2.0, step: 0.01 },
+        { key: 'sigma_bb', label: 'Σ_bb', min: 0.3, max: 2.0, step: 0.01 },
+        { key: 'rho', label: 'ρ_ab', min: -0.95, max: 0.95, step: 0.01 }
+      ];
+
+      sliderSpecs.forEach(spec => {
+        const row = controls.append('div').attr('class', 'slider-row');
+        row.append('label').attr('for', spec.key).text(spec.label);
+        row.append('input')
+          .attr('type', 'range')
+          .attr('id', spec.key)
+          .attr('min', spec.min)
+          .attr('max', spec.max)
+          .attr('step', spec.step)
+          .attr('value', state[spec.key])
+          .on('input', function() {
+            state[spec.key] = +this.value;
+            d3v.select(`#val-${spec.key}`).text(state[spec.key].toFixed(2));
+            render();
+          });
+        row.append('div')
+          .attr('class', 'value')
+          .attr('id', `val-${spec.key}`)
+          .text(state[spec.key].toFixed(2));
+      });
+
+      render();
+    })();
   </script>
 </body>
 </html>
