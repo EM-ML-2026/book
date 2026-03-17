@@ -19,6 +19,7 @@ parts:
     - file: bayesian/linear_models.md
     - file: exercises-clean/bayes_vs_bootstrap.ipynb
     - file: exercises/bayes_vs_bootstrap.ipynb
+    - file: bayesian/active_learning.md
     - file: exercises-clean/bayesnn.ipynb
     - file: exercises/bayesnn.ipynb
   - caption: Gaussian Processes
