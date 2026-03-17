@@ -16,4 +16,4 @@ parts:
     - file: frequentist/knn.ipynb
   - caption: Bayesian Regression
     chapters:
-    - file: bayesian/linear_models.ipynb
+    - file: bayesian/linear_models.md
