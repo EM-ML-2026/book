@@ -25,6 +25,7 @@ parts:
     - file: exercises/bayesnn.ipynb
   - caption: Gaussian Processes
     chapters:
+    - file: gp/equivalent_kernels.ipynb
     - file: exercises-clean/gp.ipynb
     - file: exercises/gp.ipynb
     - file: exercises-clean/gpr.ipynb
