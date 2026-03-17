@@ -29,5 +29,6 @@ parts:
     - file: gp/gp.md
     - file: exercises-clean/gp.ipynb
     - file: exercises/gp.ipynb
+    - file: gp/gp_regression.md
     - file: exercises-clean/gpr.ipynb
     - file: exercises/gpr.ipynb
