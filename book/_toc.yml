@@ -17,6 +17,7 @@ parts:
     - file: frequentist/decision_theory.ipynb
     - file: frequentist/linear_models.ipynb
     - file: frequentist/ridge_sgd.ipynb
+    - file: frequentist/nn.ipynb
   - caption: Bayesian Regression
     chapters:
     - file: bayesian/linear_models.md
