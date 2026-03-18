@@ -263,13 +263,13 @@
           controls: ['curModel'],
           showCurModel: true,
           showActivationSelector: false,
-          defaults: { N: 25, valPct: 60, epochs: 20000, neurons: 50, seed: 4, batchSize: 2, activation: 'tanh', lrMultiplier: 2.0 }
+          defaults: { N: 25, valPct: 60, epochs: 50000, neurons: 30, seed: 0, batchSize: 2, activation: 'tanh', lrMultiplier: 2.0, freq: 1.5 }
         },
         playground: {
           controls: ['freq', 'neurons', 'N', 'curModel', 'valPct'],
           showCurModel: true,
           showActivationSelector: true,
-          defaults: { N: 60, valPct: 30, epochs: 10000, neurons: 20, seed: 0, batchSize: 5, activation: 'tanh', freq: 3.4 }
+          defaults: { N: 60, valPct: 30, epochs: 50000, neurons: 20, seed: 0, batchSize: 5, activation: 'tanh', freq: 3.4 }
         }
       };
 
