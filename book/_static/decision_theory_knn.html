@@ -49,31 +49,11 @@
       overflow: hidden;
     }
 
-    .widget-header {
-      padding: 16px 18px 10px;
-      border-bottom: 1px solid #edf1f5;
-      background: linear-gradient(180deg, #fbfcfd 0%, #ffffff 100%);
-    }
-
-    .widget-title {
-      margin: 0;
-      font-size: 1.02rem;
-      font-weight: 650;
-      color: #18202a;
-    }
-
-    .widget-subtitle {
-      margin: 6px 0 0;
-      color: var(--c-muted);
-      font-size: 0.92rem;
-      line-height: 1.45;
-    }
-
     .controls {
       display: grid;
       grid-template-columns: minmax(150px, 180px) 1fr 64px;
       gap: 10px 12px;
-      padding: 16px 18px 10px;
+      padding: 12px 14px 8px;
       align-items: center;
       background: var(--c-surface-soft);
       border-bottom: 1px solid #edf1f5;
@@ -100,7 +80,7 @@
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      padding: 12px 18px 4px;
+      padding: 8px 14px 8px;
       background: var(--c-surface-soft);
       border-bottom: 1px solid #edf1f5;
     }
@@ -134,7 +114,7 @@
     }
 
     .chart-panel {
-      padding: 14px 14px 10px;
+      padding: 10px;
       background: #ffffff;
     }
 
@@ -146,7 +126,7 @@
     }
 
     .chart-layout.with-sidebar {
-      grid-template-columns: minmax(0, 1fr) minmax(180px, 22%);
+      grid-template-columns: minmax(0, 1fr) 170px;
     }
 
     .chart-frame {
@@ -199,19 +179,6 @@
       fill: #18202a;
     }
 
-    .caption {
-      padding: 0 18px 16px;
-      color: var(--c-muted);
-      font-size: 0.84rem;
-      line-height: 1.45;
-    }
-
-    @media (max-width: 900px) {
-      .chart-layout.with-sidebar {
-        grid-template-columns: minmax(0, 1fr);
-      }
-    }
-
     @media (max-width: 640px) {
       .widget-shell {
         padding: 8px;
@@ -230,24 +197,19 @@
     }
   </style>
 </head>
-<body>
-  <div class="widget-shell">
-    <div class="widget-card">
-      <div class="widget-header">
-        <h1 class="widget-title" id="widget-title"></h1>
-        <p class="widget-subtitle" id="widget-subtitle"></p>
-      </div>
-      <div class="controls" id="controls"></div>
-      <div class="button-row" id="buttons"></div>
-      <div class="chart-panel">
-        <div class="chart-layout" id="chart-layout">
-          <div class="chart-frame" id="main-frame"></div>
-          <div class="chart-frame" id="side-frame" style="display:none;"></div>
-        </div>
-      </div>
-      <div class="caption" id="caption"></div>
-    </div>
-  </div>
+	<body>
+	  <div class="widget-shell">
+	    <div class="widget-card">
+	      <div class="controls" id="controls"></div>
+	      <div class="button-row" id="buttons"></div>
+	      <div class="chart-panel">
+	        <div class="chart-layout" id="chart-layout">
+	          <div class="chart-frame" id="main-frame"></div>
+	          <div class="chart-frame" id="side-frame" style="display:none;"></div>
+	        </div>
+	      </div>
+	    </div>
+	  </div>
 
   <script>
     (() => {
@@ -258,39 +220,30 @@
       const mode = (params.get('mode') || 'training').toLowerCase();
       const MODES = {
         training: {
-          title: 'k-nearest neighbors with training loss',
-          subtitle: 'Adjust the model complexity and data generation process, then inspect how the training mean squared error responds.',
-          caption: 'The controls match the original notebook widget: noise, number of neighbors, training size, frequency, truth toggle, seed refresh, and reset.',
           showSidebar: false,
           showTruthToggle: true,
           showDatasetButtons: false,
           defaultValPct: 0,
-          heightRatio: 0.72,
-          minHeight: 520,
+          heightRatio: 0.5,
+          minHeight: 360,
           titleFormatter: (s) => `Mean squared error: ${formatFixed(s.mseTrain, 3)}`
         },
         validation: {
-          title: 'k-nearest neighbors with training and validation loss',
-          subtitle: 'Twenty percent of the generated observations are held out for validation, mirroring the interactive plot from the notebook.',
-          caption: 'Validation points are shown separately and the right-hand panel reports the training and validation errors for the current setting.',
           showSidebar: true,
           showTruthToggle: true,
           showDatasetButtons: false,
           defaultValPct: 20,
-          heightRatio: 0.72,
-          minHeight: 520,
+          heightRatio: 0.46,
+          minHeight: 360,
           titleFormatter: (s) => `Training error: ${formatFixed(s.mseTrain, 3)}, Validation error: ${formatFixed(s.mseValidation, 3)}`
         },
         biasvariance: {
-          title: 'Bias-variance tradeoff for k-nearest neighbors',
-          subtitle: 'Average over many independently generated datasets to compare the mean prediction, the bias band, and the variance envelope.',
-          caption: 'Use the dataset-count buttons to match the original 10, 30, and 2000 dataset presets. The shaded bias and variance regions follow the matplotlib version.',
           showSidebar: false,
           showTruthToggle: false,
           showDatasetButtons: true,
           defaultValPct: 0,
-          heightRatio: 0.76,
-          minHeight: 560,
+          heightRatio: 0.54,
+          minHeight: 390,
           titleFormatter: (s) => `Bias and variance computed over ${s.datasets} datasets`
         }
       };
@@ -327,13 +280,6 @@
         { key: 'N', label: 'Training size (N)', min: 1, max: 1000, step: 1, integer: true, format: (v) => `${Math.round(v)}` },
         { key: 'freq', label: 'Frequency (freq)', min: 0.125, max: 8, step: 0.001, format: (v) => formatTrimmed(v, 3) }
       ];
-
-      const titleEl = document.getElementById('widget-title');
-      const subtitleEl = document.getElementById('widget-subtitle');
-      const captionEl = document.getElementById('caption');
-      titleEl.textContent = config.title;
-      subtitleEl.textContent = config.subtitle;
-      captionEl.textContent = config.caption;
 
       const controlsEl = d3v.select('#controls');
       const buttonsEl = d3v.select('#buttons');
@@ -461,12 +407,12 @@
       function render() {
         const layoutWidth = document.body.clientWidth || 800;
         const mainWidth = mainFrame.node().clientWidth || layoutWidth - 28;
-        const sideWidth = config.showSidebar ? Math.max(180, sideFrame.node().clientWidth || 220) : 0;
+        const sideWidth = config.showSidebar ? 170 : 0;
         const chartHeight = Math.max(config.minHeight, Math.round(mainWidth * config.heightRatio));
 
-        const margin = { top: 54, right: 16, bottom: 72, left: 56 };
+        const margin = { top: 42, right: 14, bottom: 54, left: 50 };
         const innerWidth = Math.max(120, mainWidth - margin.left - margin.right);
-        const innerHeight = Math.max(200, chartHeight - margin.top - margin.bottom);
+        const innerHeight = Math.max(180, chartHeight - margin.top - margin.bottom);
 
         mainSvg.attr('viewBox', `0 0 ${mainWidth} ${chartHeight}`);
         mainRoot.attr('transform', `translate(${margin.left},${margin.top})`);
@@ -550,8 +496,8 @@
       }
 
       function renderSidebar(sideWidth, chartHeight, dataset) {
-        const sidebarWidth = Math.max(180, sideWidth || 220);
-        const margin = { top: 28, right: 14, bottom: 58, left: 48 };
+        const sidebarWidth = Math.max(170, sideWidth || 170);
+        const margin = { top: 18, right: 12, bottom: 50, left: 42 };
         const innerWidth = Math.max(80, sidebarWidth - margin.left - margin.right);
         const innerHeight = Math.max(150, chartHeight - margin.top - margin.bottom);
         const upper = Math.max(1.5, dataset.mseTrain, dataset.mseValidation || 0) * 1.12;
