@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive GP Regression</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <style>
+    :root {
+      --c-mean: #0076c2;
+      --c-fill: #0076c2;
+      --c-truth: #111111;
+      --c-grid: #ffffff;
+      --c-axis: #7f8794;
+      --c-border: #dde3ea;
+      --c-muted: #5f6b7a;
+      --c-surface: #ffffff;
+      --c-panel: #eaeaf2;
+      --c-observation: #111111;
+      --c-hover: #5f6b7a;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #1b1f24;
+      background: var(--c-surface);
+    }
+
+    .widget-shell {
+      width: 100%;
+      max-width: 100%;
+      padding: 12px;
+      margin: 0 auto;
+      background: var(--c-surface);
+    }
+
+    .widget-card {
+      width: 100%;
+      border: 1px solid var(--c-border);
+      border-radius: 12px;
+      background: var(--c-surface);
+      box-shadow: 0 1px 3px rgba(12, 35, 64, 0.06);
+      overflow: hidden;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px 10px;
+      border-bottom: 1px solid #edf1f5;
+      background: #f7f9fb;
+    }
+
+    .title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #243140;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: var(--c-muted);
+    }
+
+    button {
+      border: 1px solid #cfd7e3;
+      background: #ffffff;
+      color: #243140;
+      border-radius: 999px;
+      padding: 7px 12px;
+      cursor: pointer;
+      font-size: 0.84rem;
+      line-height: 1.2;
+      transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      background: #f5f8fc;
+      border-color: #b9c7d8;
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    .chart-panel {
+      padding: 10px;
+      background: #ffffff;
+    }
+
+    .chart-frame {
+      width: 100%;
+      border: 1px solid var(--c-border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--c-panel);
+    }
+
+    .chart-frame svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .axis path,
+    .axis line {
+      stroke: var(--c-axis);
+    }
+
+    .axis text,
+    .legend text,
+    .hover-label,
+    .annotation,
+    .status-text,
+    .axis-label {
+      font-family: inherit;
+    }
+
+    .axis text,
+    .axis-label {
+      fill: #44505d;
+      font-size: 12px;
+    }
+
+    .grid line {
+      stroke: var(--c-grid);
+      stroke-opacity: 0.95;
+    }
+
+    .grid path {
+      display: none;
+    }
+
+    .legend text {
+      font-size: 12px;
+      fill: #243140;
+    }
+
+    .hover-line {
+      stroke: var(--c-hover);
+      stroke-width: 1.5;
+      stroke-dasharray: 6 6;
+      pointer-events: none;
+    }
+
+    .hover-label {
+      font-size: 12px;
+      fill: var(--c-hover);
+      font-weight: 600;
+      pointer-events: none;
+    }
+
+    .annotation,
+    .status-text {
+      fill: var(--c-muted);
+      font-size: 12px;
+    }
+
+    .status-text {
+      font-variant-numeric: tabular-nums;
+    }
+
+    @media (max-width: 640px) {
+      .widget-shell { padding: 8px; }
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="widget-shell">
+    <div class="widget-card">
+      <div class="header">
+        <div class="title-group">
+          <div class="title">Gaussian process regression</div>
+          <div class="subtitle">Hover to choose an input location, then click to reveal a noisy observation and update the GP posterior.</div>
+        </div>
+        <button id="reset-button" type="button">Reset observations</button>
+      </div>
+      <div class="chart-panel">
+        <div class="chart-frame" id="chart-frame"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const d3v = window.d3;
+      if (!d3v) {
+        document.getElementById('chart-frame').innerHTML = '<p style="color:#b00020;padding:12px">D3 failed to load from CDN.</p>';
+        return;
+      }
+
+      const TWO_PI = Math.PI * 2;
+      const SIGMA_F = 0.60786466;
+      const LENGTH_SCALE = 1.12533346;
+      const NOISE_PRECISION = 200.0;
+      const OBS_VARIANCE = 1 / NOISE_PRECISION;
+      const OBS_STD = Math.sqrt(OBS_VARIANCE);
+      const GRID_COUNT = 140;
+      const MAX_VISIBLE_SAMPLES = 10;
+      const SAMPLE_INTERVAL_MS = 900;
+      const TRANSITION_MS = 700;
+      const SAMPLE_COLORS = ['#0076C2', '#EC6842', '#A50034', '#009B77', '#FFB81C', '#E03C31', '#6CC24A', '#EF60A3', '#0C2340', '#00B8C8', '#6F1D77'];
+      const JITTER = 1e-8;
+
+      const xGrid = d3v.range(GRID_COUNT).map((i) => (i / (GRID_COUNT - 1)) * TWO_PI);
+      const yExtent = [-1.55, 1.55];
+      const state = {
+        observations: [],
+        hoveredX: null,
+        samples: [],
+        sampleCounter: 0,
+        model: null
+      };
+
+      const frame = d3v.select('#chart-frame');
+      const svg = frame.append('svg');
+      const plotLayer = svg.append('g');
+      const defs = svg.append('defs');
+      defs.append('clipPath').attr('id', 'plot-clip').append('rect');
+
+      const panelLayer = plotLayer.append('g');
+      const gridLayer = plotLayer.append('g').attr('class', 'grid');
+      const samplesLayer = plotLayer.append('g').attr('clip-path', 'url(#plot-clip)');
+      const bandLayer = plotLayer.append('g').attr('clip-path', 'url(#plot-clip)');
+      const meanLayer = plotLayer.append('g').attr('clip-path', 'url(#plot-clip)');
+      const truthLayer = plotLayer.append('g').attr('clip-path', 'url(#plot-clip)');
+      const observationsLayer = plotLayer.append('g').attr('clip-path', 'url(#plot-clip)');
+      const overlayLayer = plotLayer.append('g');
+      const axesLayer = plotLayer.append('g');
+      const legendLayer = plotLayer.append('g').attr('class', 'legend');
+      const infoLayer = plotLayer.append('g');
+
+      const bandPath = bandLayer.append('path')
+        .attr('fill', 'var(--c-fill)')
+        .attr('fill-opacity', 0.15)
+        .attr('stroke', 'none');
+
+      const meanPath = meanLayer.append('path')
+        .attr('fill', 'none')
+        .attr('stroke', 'var(--c-mean)')
+        .attr('stroke-width', 2.5)
+        .attr('stroke-linejoin', 'round')
+        .attr('stroke-linecap', 'round');
+
+      const truthPath = truthLayer.append('path')
+        .attr('fill', 'none')
+        .attr('stroke', 'var(--c-truth)')
+        .attr('stroke-width', 1.25)
+        .attr('stroke-dasharray', '5 4');
+
+      const hoverLine = overlayLayer.append('line')
+        .attr('class', 'hover-line')
+        .style('opacity', 0);
+
+      const hoverLabel = overlayLayer.append('text')
+        .attr('class', 'hover-label')
+        .attr('text-anchor', 'middle')
+        .style('opacity', 0)
+        .text('observe here');
+
+      const statusText = infoLayer.append('text')
+        .attr('class', 'status-text');
+
+      const noteText = infoLayer.append('text')
+        .attr('class', 'annotation')
+        .text('Samples are draws from y(x); the shaded region is the 95% interval for t.');
+
+      const axisBottom = axesLayer.append('g').attr('class', 'axis');
+      const axisLeft = axesLayer.append('g').attr('class', 'axis');
+      const xLabel = axesLayer.append('text').attr('class', 'axis-label').attr('text-anchor', 'middle').text('x');
+      const yLabel = axesLayer.append('text').attr('class', 'axis-label').attr('text-anchor', 'middle').text('y');
+      const interactionRect = overlayLayer.append('rect')
+        .attr('fill', 'transparent')
+        .style('cursor', 'crosshair');
+
+      const xScale = d3v.scaleLinear().domain([0, TWO_PI]);
+      const yScale = d3v.scaleLinear().domain(yExtent);
+      const lineGenerator = d3v.line()
+        .x((d) => xScale(d.x))
+        .y((d) => yScale(d.y))
+        .curve(d3v.curveBasis);
+      const areaGenerator = d3v.area()
+        .x((d) => xScale(d.x))
+        .y0((d) => yScale(d.lower))
+        .y1((d) => yScale(d.upper))
+        .curve(d3v.curveBasis);
+
+      let layout = null;
+      let sampleTimer = null;
+
+      function mulberry32(seed) {
+        let a = seed >>> 0;
+        return function random() {
+          a = (a + 0x6D2B79F5) >>> 0;
+          let t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      const noiseRng = mulberry32(123456789);
+
+      function randomNormal(rng = Math.random) {
+        let u = 0;
+        let v = 0;
+        while (u === 0) u = rng();
+        while (v === 0) v = rng();
+        return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+      }
+
+      function groundTruth(x) {
+        return Math.sin(x);
+      }
+
+      function kernel(a, b) {
+        const diff = a - b;
+        return SIGMA_F * SIGMA_F * Math.exp(-0.5 * (diff * diff) / (LENGTH_SCALE * LENGTH_SCALE));
+      }
+
+      function cholesky(matrix) {
+        const n = matrix.length;
+        const L = Array.from({ length: n }, () => Array(n).fill(0));
+        for (let i = 0; i < n; i += 1) {
+          for (let j = 0; j <= i; j += 1) {
+            let sum = matrix[i][j];
+            for (let k = 0; k < j; k += 1) {
+              sum -= L[i][k] * L[j][k];
+            }
+            if (i === j) {
+              L[i][j] = Math.sqrt(Math.max(sum, JITTER));
+            } else {
+              L[i][j] = sum / L[j][j];
+            }
+          }
+        }
+        return L;
+      }
+
+      function solveLower(L, b) {
+        const n = L.length;
+        const x = Array(n).fill(0);
+        for (let i = 0; i < n; i += 1) {
+          let sum = b[i];
+          for (let j = 0; j < i; j += 1) {
+            sum -= L[i][j] * x[j];
+          }
+          x[i] = sum / L[i][i];
+        }
+        return x;
+      }
+
+      function solveUpperFromLower(L, b) {
+        const n = L.length;
+        const x = Array(n).fill(0);
+        for (let i = n - 1; i >= 0; i -= 1) {
+          let sum = b[i];
+          for (let j = i + 1; j < n; j += 1) {
+            sum -= L[j][i] * x[j];
+          }
+          x[i] = sum / L[i][i];
+        }
+        return x;
+      }
+
+      function solveWithCholesky(L, b) {
+        return solveUpperFromLower(L, solveLower(L, b));
+      }
+
+      function solveMatrixWithCholesky(L, B) {
+        return B.map((column) => solveWithCholesky(L, column));
+      }
+
+      function computeModel(observations) {
+        const n = observations.length;
+        const latentCov = Array.from({ length: GRID_COUNT }, () => Array(GRID_COUNT).fill(0));
+        const gridToXCov = Array.from({ length: GRID_COUNT }, () => Array(n).fill(0));
+        const predictiveMean = Array(GRID_COUNT).fill(0);
+        const predictiveVar = Array(GRID_COUNT).fill(0);
+
+        for (let i = 0; i < GRID_COUNT; i += 1) {
+          for (let j = 0; j < GRID_COUNT; j += 1) {
+            latentCov[i][j] = kernel(xGrid[i], xGrid[j]);
+          }
+        }
+
+        if (n === 0) {
+          for (let i = 0; i < GRID_COUNT; i += 1) {
+            predictiveVar[i] = latentCov[i][i] + OBS_VARIANCE;
+          }
+          return {
+            mean: predictiveMean,
+            latentCov,
+            predictiveVar,
+            interval: predictiveMean.map((value, i) => ({
+              x: xGrid[i],
+              lower: value - 1.96 * Math.sqrt(Math.max(predictiveVar[i], 0)),
+              upper: value + 1.96 * Math.sqrt(Math.max(predictiveVar[i], 0))
+            }))
+          };
+        }
+
+        const X = observations.map((d) => d.x);
+        const y = observations.map((d) => d.y);
+        const Kxx = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => kernel(X[i], X[j]) + (i === j ? OBS_VARIANCE : 0)));
+        const L = cholesky(Kxx);
+        const alpha = solveWithCholesky(L, y);
+
+        for (let i = 0; i < GRID_COUNT; i += 1) {
+          for (let j = 0; j < n; j += 1) {
+            gridToXCov[i][j] = kernel(xGrid[i], X[j]);
+          }
+        }
+
+        for (let i = 0; i < GRID_COUNT; i += 1) {
+          let meanValue = 0;
+          for (let j = 0; j < n; j += 1) {
+            meanValue += gridToXCov[i][j] * alpha[j];
+          }
+          predictiveMean[i] = meanValue;
+        }
+
+        const solvedColumns = solveMatrixWithCholesky(L, Array.from({ length: GRID_COUNT }, (_, i) => gridToXCov[i]));
+
+        for (let i = 0; i < GRID_COUNT; i += 1) {
+          for (let j = 0; j < GRID_COUNT; j += 1) {
+            let reduction = 0;
+            for (let k = 0; k < n; k += 1) {
+              reduction += gridToXCov[i][k] * solvedColumns[j][k];
+            }
+            latentCov[i][j] -= reduction;
+          }
+          latentCov[i][i] = Math.max(latentCov[i][i], 0);
+          predictiveVar[i] = latentCov[i][i] + OBS_VARIANCE;
+        }
+
+        return {
+          mean: predictiveMean,
+          latentCov,
+          predictiveVar,
+          interval: predictiveMean.map((value, i) => ({
+            x: xGrid[i],
+            lower: value - 1.96 * Math.sqrt(Math.max(predictiveVar[i], 0)),
+            upper: value + 1.96 * Math.sqrt(Math.max(predictiveVar[i], 0))
+          }))
+        };
+      }
+
+      function sampleFromModel(model) {
+        const rng = mulberry32((state.sampleCounter * 2654435761) >>> 0);
+        const cov = model.latentCov.map((row, i) => row.map((value, j) => value + (i === j ? JITTER : 0)));
+        const L = cholesky(cov);
+        const z = Array.from({ length: GRID_COUNT }, () => randomNormal(rng));
+        const values = Array(GRID_COUNT).fill(0);
+        for (let i = 0; i < GRID_COUNT; i += 1) {
+          let sum = model.mean[i];
+          for (let j = 0; j <= i; j += 1) {
+            sum += L[i][j] * z[j];
+          }
+          values[i] = sum;
+        }
+        const sample = {
+          id: state.sampleCounter,
+          color: SAMPLE_COLORS[state.sampleCounter % SAMPLE_COLORS.length],
+          points: xGrid.map((x, i) => ({ x, y: values[i] }))
+        };
+        state.sampleCounter += 1;
+        state.samples.push(sample);
+        if (state.samples.length > MAX_VISIBLE_SAMPLES) {
+          state.samples = state.samples.slice(-MAX_VISIBLE_SAMPLES);
+        }
+      }
+
+      function renderSamples() {
+        const total = state.samples.length;
+        const paths = samplesLayer.selectAll('path.sample').data(state.samples, (d) => d.id);
+
+        paths.enter()
+          .append('path')
+          .attr('class', 'sample')
+          .attr('fill', 'none')
+          .attr('stroke-width', 1.4)
+          .attr('stroke-linejoin', 'round')
+          .attr('stroke-linecap', 'round')
+          .attr('stroke', (d) => d.color)
+          .attr('opacity', 0)
+          .attr('d', (d) => lineGenerator(d.points))
+          .merge(paths)
+          .transition()
+          .duration(350)
+          .ease(d3v.easeCubicOut)
+          .attr('stroke', (d) => d.color)
+          .attr('d', (d) => lineGenerator(d.points))
+          .attr('opacity', (_, i) => {
+            if (total <= 1) return 0.82;
+            return 0.82 * (i + 1) / total;
+          });
+
+        paths.exit()
+          .transition()
+          .duration(250)
+          .attr('opacity', 0)
+          .remove();
+      }
+
+      function updateCurves(previousModel, nextModel) {
+        const previousAreaData = previousModel ? previousModel.interval : nextModel.interval;
+        const previousMeanData = xGrid.map((x, i) => ({ x, y: previousModel ? previousModel.mean[i] : nextModel.mean[i] }));
+        const nextMeanData = xGrid.map((x, i) => ({ x, y: nextModel.mean[i] }));
+
+        bandPath
+          .datum(previousAreaData)
+          .attr('d', areaGenerator)
+          .transition()
+          .duration(TRANSITION_MS)
+          .ease(d3v.easeCubicInOut)
+          .attrTween('d', function attrTweenBand() {
+            const interp = d3v.interpolateArray(previousAreaData, nextModel.interval);
+            return (t) => areaGenerator(interp(t));
+          });
+
+        meanPath
+          .datum(previousMeanData)
+          .attr('d', lineGenerator)
+          .transition()
+          .duration(TRANSITION_MS)
+          .ease(d3v.easeCubicInOut)
+          .attrTween('d', function attrTweenMean() {
+            const interp = d3v.interpolateArray(previousMeanData, nextMeanData);
+            return (t) => lineGenerator(interp(t));
+          });
+      }
+
+      function renderObservations() {
+        const circles = observationsLayer.selectAll('circle.observation').data(state.observations, (d) => d.id);
+        circles.enter()
+          .append('circle')
+          .attr('class', 'observation')
+          .attr('cx', (d) => xScale(d.x))
+          .attr('cy', (d) => yScale(d.y))
+          .attr('r', 0)
+          .attr('fill', 'var(--c-observation)')
+          .transition()
+          .duration(350)
+          .ease(d3v.easeBackOut.overshoot(1.4))
+          .attr('r', 3.8);
+
+        circles
+          .transition()
+          .duration(250)
+          .attr('cx', (d) => xScale(d.x))
+          .attr('cy', (d) => yScale(d.y))
+          .attr('r', 3.8);
+
+        circles.exit().remove();
+      }
+
+      function renderLegend() {
+        const items = [
+          { label: 'Ground truth', type: 'line-dashed', color: '#111111' },
+          { label: '95% conf. interval', type: 'fill', color: '#0076c2' },
+          { label: 'Mean', type: 'line', color: '#0076c2' },
+          { label: 'y(x) samples', type: 'sample', color: '#7b8794' }
+        ];
+
+        const legendWidth = 164;
+        const legendHeight = 92;
+        const legendX = layout.margin.left + Math.max(14, layout.innerWidth * 0.37);
+        const legendY = layout.margin.top + layout.innerHeight - legendHeight - 12;
+
+        const box = legendLayer.selectAll('rect.legend-box').data([null]);
+        box.enter()
+          .append('rect')
+          .attr('class', 'legend-box')
+          .attr('rx', 6)
+          .attr('ry', 6)
+          .merge(box)
+          .attr('x', legendX)
+          .attr('y', legendY)
+          .attr('width', legendWidth)
+          .attr('height', legendHeight)
+          .attr('fill', 'rgba(255,255,255,0.86)')
+          .attr('stroke', '#cfd7e3');
+
+        const rows = legendLayer.selectAll('g.legend-row').data(items);
+        const rowsEnter = rows.enter().append('g').attr('class', 'legend-row');
+        rowsEnter.append('line');
+        rowsEnter.append('rect');
+        rowsEnter.append('circle');
+        rowsEnter.append('text');
+
+        rowsEnter.merge(rows)
+          .attr('transform', (_, i) => `translate(${legendX + 12}, ${legendY + 18 + i * 18})`)
+          .each(function eachLegend(item) {
+            const row = d3v.select(this);
+            row.select('line')
+              .attr('x1', 0)
+              .attr('x2', 22)
+              .attr('y1', 0)
+              .attr('y2', 0)
+              .attr('stroke', item.color)
+              .attr('stroke-width', item.type === 'line' ? 2.5 : 1.5)
+              .attr('stroke-dasharray', item.type === 'line-dashed' || item.type === 'sample' ? '5 4' : null)
+              .attr('opacity', item.type === 'sample' ? 0.55 : 1)
+              .style('display', item.type === 'fill' ? 'none' : null);
+            row.select('rect')
+              .attr('x', 0)
+              .attr('y', -5)
+              .attr('width', 22)
+              .attr('height', 10)
+              .attr('fill', item.color)
+              .attr('opacity', item.type === 'fill' ? 0.15 : 0)
+              .style('display', item.type === 'fill' ? null : 'none');
+            row.select('circle')
+              .attr('cx', 11)
+              .attr('cy', 0)
+              .attr('r', 3)
+              .attr('fill', '#111111')
+              .style('display', 'none');
+            row.select('text')
+              .attr('x', 30)
+              .attr('y', 4)
+              .text(item.label);
+          });
+
+        rows.exit().remove();
+      }
+
+      function renderTruth() {
+        truthPath.attr('d', lineGenerator(xGrid.map((x) => ({ x, y: groundTruth(x) }))));
+      }
+
+      function renderHover() {
+        if (state.hoveredX == null || !layout) {
+          hoverLine.style('opacity', 0);
+          hoverLabel.style('opacity', 0);
+          return;
+        }
+        const xPos = xScale(state.hoveredX);
+        hoverLine
+          .style('opacity', 1)
+          .attr('x1', xPos)
+          .attr('x2', xPos)
+          .attr('y1', yScale.range()[0])
+          .attr('y2', yScale.range()[1]);
+        hoverLabel
+          .style('opacity', 1)
+          .attr('x', xPos)
+          .attr('y', layout.margin.top + 16);
+      }
+
+      function refreshStatus() {
+        statusText
+          .attr('x', layout.margin.left)
+          .attr('y', layout.margin.top - 12)
+          .text(`Observations: ${state.observations.length}`);
+        noteText
+          .attr('x', layout.margin.left)
+          .attr('y', layout.height - 12);
+      }
+
+      function renderAxes() {
+        axisBottom
+          .attr('transform', `translate(0, ${layout.margin.top + layout.innerHeight})`)
+          .call(d3v.axisBottom(xScale).tickValues([0, 1, 2, 3, 4, 5, 6]));
+        axisLeft
+          .attr('transform', `translate(${layout.margin.left}, 0)`)
+          .call(d3v.axisLeft(yScale).tickValues([-1, -0.5, 0, 0.5, 1]));
+        xLabel
+          .attr('x', layout.margin.left + layout.innerWidth / 2)
+          .attr('y', layout.margin.top + layout.innerHeight + 42);
+        yLabel
+          .attr('transform', `translate(${layout.margin.left - 42}, ${layout.margin.top + layout.innerHeight / 2}) rotate(-90)`);
+      }
+
+      function renderGrid() {
+        gridLayer
+          .attr('transform', `translate(${layout.margin.left},0)`)
+          .call(d3v.axisLeft(yScale)
+            .tickValues([-1, -0.5, 0, 0.5, 1])
+            .tickSize(-layout.innerWidth)
+            .tickFormat(''));
+      }
+
+      function resize() {
+        const frameWidth = frame.node().clientWidth || document.body.clientWidth || 820;
+        const width = Math.max(520, frameWidth);
+        const height = Math.max(380, Math.round(width * 0.58));
+        layout = {
+          width,
+          height,
+          margin: { top: 34, right: 18, bottom: 56, left: 56 },
+          innerWidth: width - 74,
+          innerHeight: height - 90
+        };
+
+        svg.attr('viewBox', `0 0 ${width} ${height}`);
+        xScale.range([layout.margin.left, layout.margin.left + layout.innerWidth]);
+        yScale.range([layout.margin.top + layout.innerHeight, layout.margin.top]);
+
+        panelLayer.selectAll('rect.panel-bg').data([null]).join('rect')
+          .attr('class', 'panel-bg')
+          .attr('x', layout.margin.left)
+          .attr('y', layout.margin.top)
+          .attr('width', layout.innerWidth)
+          .attr('height', layout.innerHeight)
+          .attr('fill', 'var(--c-panel)');
+
+        defs.select('#plot-clip rect')
+          .attr('x', layout.margin.left)
+          .attr('y', layout.margin.top)
+          .attr('width', layout.innerWidth)
+          .attr('height', layout.innerHeight);
+
+        interactionRect
+          .attr('x', layout.margin.left)
+          .attr('y', layout.margin.top)
+          .attr('width', layout.innerWidth)
+          .attr('height', layout.innerHeight);
+
+        renderGrid();
+        renderAxes();
+        renderTruth();
+        if (state.model) {
+          bandPath.attr('d', areaGenerator(state.model.interval));
+          meanPath.attr('d', lineGenerator(xGrid.map((x, i) => ({ x, y: state.model.mean[i] }))));
+        }
+        renderSamples();
+        renderObservations();
+        renderHover();
+        refreshStatus();
+        renderLegend();
+      }
+
+      function refreshModel(previousModel = state.model) {
+        const nextModel = computeModel(state.observations);
+        state.model = nextModel;
+        updateCurves(previousModel, nextModel);
+        state.samples = [];
+        sampleFromModel(nextModel);
+        renderSamples();
+        renderObservations();
+        refreshStatus();
+      }
+
+      function handleHover(event) {
+        if (!layout) return;
+        const [mx] = d3v.pointer(event, svg.node());
+        const clamped = Math.max(layout.margin.left, Math.min(layout.margin.left + layout.innerWidth, mx));
+        state.hoveredX = xScale.invert(clamped);
+        renderHover();
+      }
+
+      function handleClick(event) {
+        handleHover(event);
+        if (state.hoveredX == null) return;
+        const x = state.hoveredX;
+        const y = groundTruth(x) + OBS_STD * randomNormal(noiseRng);
+        state.observations.push({ id: `${Date.now()}-${state.observations.length}`, x, y });
+        refreshModel(state.model);
+      }
+
+      interactionRect
+        .on('mouseenter', handleHover)
+        .on('mousemove', handleHover)
+        .on('mouseleave', () => {
+          state.hoveredX = null;
+          renderHover();
+        })
+        .on('click', handleClick);
+
+      d3v.select('#reset-button').on('click', () => {
+        state.observations = [];
+        state.hoveredX = null;
+        refreshModel(state.model);
+        renderHover();
+      });
+
+      function startSampleLoop() {
+        if (sampleTimer) window.clearInterval(sampleTimer);
+        sampleTimer = window.setInterval(() => {
+          if (!state.model) return;
+          sampleFromModel(state.model);
+          renderSamples();
+        }, SAMPLE_INTERVAL_MS);
+      }
+
+      state.model = computeModel(state.observations);
+      renderTruth();
+      resize();
+      refreshModel(null);
+      startSampleLoop();
+      new ResizeObserver(() => resize()).observe(document.body);
+    })();
+  </script>
+</body>
+</html>

@@ -86,4 +86,6 @@ Note how all desirable features for a robust model are present:
 - The variance gives a measure of prediction uncertainty, increasing away from the observations;
 - Hyperparameters are learned directly from data without the need for a validation dataset.
 
+<iframe src="../_static/gp-regression-interactive.html" style="width: 100%; height: 560px; border: 0;" loading="lazy"></iframe>
+
 In the next page we will go through this last point, namely how to determine suitable values for the kernel hyperparameters.
