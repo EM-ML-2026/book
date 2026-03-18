@@ -208,7 +208,7 @@
       const TWO_PI = Math.PI * 2;
       const SIGMA_F = 0.60786466;
       const LENGTH_SCALE = 1.12533346;
-      const NOISE_PRECISION = 111.03618038;
+      const NOISE_PRECISION = 200.0;
       const OBS_VARIANCE = 1 / NOISE_PRECISION;
       const OBS_STD = Math.sqrt(OBS_VARIANCE);
       const GRID_COUNT = 140;
@@ -668,7 +668,7 @@
         statusText
           .attr('x', layout.margin.left)
           .attr('y', layout.margin.top - 12)
-          .text(`Observations: ${state.observations.length} · σ_f = ${SIGMA_F.toFixed(3)} · ℓ = ${LENGTH_SCALE.toFixed(3)} · noise sd = ${OBS_STD.toFixed(3)}`);
+          .text(`Observations: ${state.observations.length}`);
         noteText
           .attr('x', layout.margin.left)
           .attr('y', layout.height - 12);
