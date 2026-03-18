@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Decision Theory kNN Widget</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <style>
+    :root {
+      --c-truth: #111111;
+      --c-data: #0076c2;
+      --c-pred: #ec6842;
+      --c-validation: #6f1d77;
+      --c-accent: #009b77;
+      --c-bias: #a50034;
+      --c-grid: #d9dee5;
+      --c-axis: #5c6570;
+      --c-border: #dde3ea;
+      --c-muted: #5f6b7a;
+      --c-surface: #ffffff;
+      --c-surface-soft: #f7f9fb;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #1b1f24;
+      background: var(--c-surface);
+    }
+
+    .widget-shell {
+      width: 100%;
+      max-width: 100%;
+      padding: 12px;
+      margin: 0 auto;
+      background: var(--c-surface);
+    }
+
+    .widget-card {
+      width: 100%;
+      border: 1px solid var(--c-border);
+      border-radius: 12px;
+      background: var(--c-surface);
+      box-shadow: 0 1px 3px rgba(12, 35, 64, 0.06);
+      overflow: hidden;
+    }
+
+    .widget-header {
+      padding: 16px 18px 10px;
+      border-bottom: 1px solid #edf1f5;
+      background: linear-gradient(180deg, #fbfcfd 0%, #ffffff 100%);
+    }
+
+    .widget-title {
+      margin: 0;
+      font-size: 1.02rem;
+      font-weight: 650;
+      color: #18202a;
+    }
+
+    .widget-subtitle {
+      margin: 6px 0 0;
+      color: var(--c-muted);
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(150px, 180px) 1fr 64px;
+      gap: 10px 12px;
+      padding: 16px 18px 10px;
+      align-items: center;
+      background: var(--c-surface-soft);
+      border-bottom: 1px solid #edf1f5;
+    }
+
+    .control-label {
+      font-size: 0.94rem;
+      color: #243140;
+    }
+
+    .control-value {
+      text-align: right;
+      color: var(--c-muted);
+      font-variant-numeric: tabular-nums;
+      font-size: 0.84rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--c-data);
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 18px 4px;
+      background: var(--c-surface-soft);
+      border-bottom: 1px solid #edf1f5;
+    }
+
+    button {
+      border: 1px solid #cfd7e3;
+      background: #ffffff;
+      color: #243140;
+      border-radius: 999px;
+      padding: 7px 12px;
+      cursor: pointer;
+      font-size: 0.86rem;
+      line-height: 1.2;
+      transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+    }
+
+    button:hover {
+      background: #f5f8fc;
+      border-color: #b9c7d8;
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button.is-active {
+      background: #eef5fb;
+      border-color: #7cb3df;
+      color: #0f4b75;
+      font-weight: 600;
+    }
+
+    .chart-panel {
+      padding: 14px 14px 10px;
+      background: #ffffff;
+    }
+
+    .chart-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .chart-layout.with-sidebar {
+      grid-template-columns: minmax(0, 1fr) minmax(180px, 22%);
+    }
+
+    .chart-frame {
+      width: 100%;
+      border: 1px solid var(--c-border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    .chart-frame svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .axis path,
+    .axis line {
+      stroke: var(--c-axis);
+    }
+
+    .grid line {
+      stroke: var(--c-grid);
+      stroke-opacity: 0.85;
+    }
+
+    .grid path {
+      display: none;
+    }
+
+    .legend text,
+    .axis text,
+    .title-layer text {
+      font-family: inherit;
+    }
+
+    .legend text {
+      font-size: 12px;
+      fill: #243140;
+    }
+
+    .axis text {
+      font-size: 12px;
+      fill: #44505d;
+    }
+
+    .title-layer text {
+      font-size: 15px;
+      font-weight: 600;
+      fill: #18202a;
+    }
+
+    .caption {
+      padding: 0 18px 16px;
+      color: var(--c-muted);
+      font-size: 0.84rem;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 900px) {
+      .chart-layout.with-sidebar {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    @media (max-width: 640px) {
+      .widget-shell {
+        padding: 8px;
+      }
+
+      .controls {
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+
+      .control-value {
+        text-align: left;
+        margin-top: -4px;
+        margin-bottom: 4px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="widget-shell">
+    <div class="widget-card">
+      <div class="widget-header">
+        <h1 class="widget-title" id="widget-title"></h1>
+        <p class="widget-subtitle" id="widget-subtitle"></p>
+      </div>
+      <div class="controls" id="controls"></div>
+      <div class="button-row" id="buttons"></div>
+      <div class="chart-panel">
+        <div class="chart-layout" id="chart-layout">
+          <div class="chart-frame" id="main-frame"></div>
+          <div class="chart-frame" id="side-frame" style="display:none;"></div>
+        </div>
+      </div>
+      <div class="caption" id="caption"></div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const d3v = window.d3;
+      if (!d3v) return;
+
+      const params = new URLSearchParams(window.location.search);
+      const mode = (params.get('mode') || 'training').toLowerCase();
+      const MODES = {
+        training: {
+          title: 'k-nearest neighbors with training loss',
+          subtitle: 'Adjust the model complexity and data generation process, then inspect how the training mean squared error responds.',
+          caption: 'The controls match the original notebook widget: noise, number of neighbors, training size, frequency, truth toggle, seed refresh, and reset.',
+          showSidebar: false,
+          showTruthToggle: true,
+          showDatasetButtons: false,
+          defaultValPct: 0,
+          heightRatio: 0.72,
+          minHeight: 520,
+          titleFormatter: (s) => `Mean squared error: ${formatFixed(s.mseTrain, 3)}`
+        },
+        validation: {
+          title: 'k-nearest neighbors with training and validation loss',
+          subtitle: 'Twenty percent of the generated observations are held out for validation, mirroring the interactive plot from the notebook.',
+          caption: 'Validation points are shown separately and the right-hand panel reports the training and validation errors for the current setting.',
+          showSidebar: true,
+          showTruthToggle: true,
+          showDatasetButtons: false,
+          defaultValPct: 20,
+          heightRatio: 0.72,
+          minHeight: 520,
+          titleFormatter: (s) => `Training error: ${formatFixed(s.mseTrain, 3)}, Validation error: ${formatFixed(s.mseValidation, 3)}`
+        },
+        biasvariance: {
+          title: 'Bias-variance tradeoff for k-nearest neighbors',
+          subtitle: 'Average over many independently generated datasets to compare the mean prediction, the bias band, and the variance envelope.',
+          caption: 'Use the dataset-count buttons to match the original 10, 30, and 2000 dataset presets. The shaded bias and variance regions follow the matplotlib version.',
+          showSidebar: false,
+          showTruthToggle: false,
+          showDatasetButtons: true,
+          defaultValPct: 0,
+          heightRatio: 0.76,
+          minHeight: 560,
+          titleFormatter: (s) => `Bias and variance computed over ${s.datasets} datasets`
+        }
+      };
+
+      const config = MODES[mode] || MODES.training;
+      const defaults = {
+        epsilon: 0.7,
+        k: 1,
+        N: 100,
+        freq: 1,
+        probe: 0.5,
+        seed: 0,
+        showTruth: true,
+        datasets: 30,
+        valPct: config.defaultValPct
+      };
+
+      const state = { ...defaults };
+      const constants = {
+        xmin: 0,
+        xmax: 2 * Math.PI,
+        xPred: d3v.range(600).map(i => (2 * Math.PI) * i / 599),
+        colorData: getCSS('--c-data'),
+        colorTruth: getCSS('--c-truth'),
+        colorPred: getCSS('--c-pred'),
+        colorValidation: getCSS('--c-validation'),
+        colorAccent: getCSS('--c-accent'),
+        colorBias: getCSS('--c-bias')
+      };
+
+      const controlSpec = [
+        { key: 'epsilon', label: 'Noise (ε)', min: 0, max: 1, step: 0.01, format: (v) => formatFixed(v, 2) },
+        { key: 'k', label: 'Neighbors (k)', min: 1, max: 100, step: 1, integer: true, format: (v) => `${Math.round(v)}` },
+        { key: 'N', label: 'Training size (N)', min: 1, max: 1000, step: 1, integer: true, format: (v) => `${Math.round(v)}` },
+        { key: 'freq', label: 'Frequency (freq)', min: 0.125, max: 8, step: 0.001, format: (v) => formatTrimmed(v, 3) }
+      ];
+
+      const titleEl = document.getElementById('widget-title');
+      const subtitleEl = document.getElementById('widget-subtitle');
+      const captionEl = document.getElementById('caption');
+      titleEl.textContent = config.title;
+      subtitleEl.textContent = config.subtitle;
+      captionEl.textContent = config.caption;
+
+      const controlsEl = d3v.select('#controls');
+      const buttonsEl = d3v.select('#buttons');
+      const chartLayoutEl = d3v.select('#chart-layout');
+      const sideFrame = d3v.select('#side-frame');
+      if (config.showSidebar) {
+        chartLayoutEl.classed('with-sidebar', true);
+        sideFrame.style('display', null);
+      }
+
+      const controlMap = new Map();
+      controlSpec.forEach((spec) => addControl(spec));
+      addButtons();
+
+      const mainFrame = d3v.select('#main-frame');
+      const mainSvg = mainFrame.append('svg');
+      const sideSvg = sideFrame.append('svg');
+
+      const mainRoot = mainSvg.append('g');
+      const gridX = mainRoot.append('g').attr('class', 'grid');
+      const gridY = mainRoot.append('g').attr('class', 'grid');
+      const axisX = mainRoot.append('g').attr('class', 'axis');
+      const axisY = mainRoot.append('g').attr('class', 'axis');
+      const titleLayer = mainSvg.append('g').attr('class', 'title-layer');
+      const truthPath = mainRoot.append('path').attr('fill', 'none').attr('stroke-width', 2.2).attr('stroke', constants.colorTruth);
+      const predPath = mainRoot.append('path').attr('fill', 'none').attr('stroke-width', 2.3).attr('stroke', constants.colorPred);
+      const validationGroup = mainRoot.append('g');
+      const dataGroup = mainRoot.append('g');
+      const biasArea = mainRoot.append('path').attr('fill', constants.colorBias).attr('opacity', 0.55).style('display', 'none');
+      const varianceLowerArea = mainRoot.append('path').attr('fill', constants.colorBias).attr('opacity', 0.22).style('display', 'none');
+      const varianceUpperArea = mainRoot.append('path').attr('fill', constants.colorBias).attr('opacity', 0.22).style('display', 'none');
+      const legendLayer = mainSvg.append('g').attr('class', 'legend');
+      const axisLabelX = mainSvg.append('text').attr('text-anchor', 'middle').attr('fill', '#243140');
+      const axisLabelY = mainSvg.append('text').attr('text-anchor', 'middle').attr('fill', '#243140');
+
+      const sideRoot = sideSvg.append('g');
+      const sideAxisX = sideRoot.append('g').attr('class', 'axis');
+      const sideAxisY = sideRoot.append('g').attr('class', 'axis');
+      const sideGridY = sideRoot.append('g').attr('class', 'grid');
+      const sideTrainPoint = sideRoot.append('circle').attr('r', 5).attr('fill', constants.colorData);
+      const sideValidationPoint = sideRoot.append('circle').attr('r', 5).attr('fill', constants.colorValidation);
+      const sideLabelY = sideSvg.append('text').attr('text-anchor', 'middle').attr('fill', '#243140');
+      const sideLegend = sideSvg.append('g').attr('class', 'legend');
+
+      function addControl(spec) {
+        controlsEl.append('label').attr('class', 'control-label').attr('for', `control-${spec.key}`).text(spec.label);
+        const input = controlsEl.append('input')
+          .attr('id', `control-${spec.key}`)
+          .attr('type', 'range')
+          .attr('min', spec.min)
+          .attr('max', spec.max)
+          .attr('step', spec.step)
+          .property('value', defaults[spec.key]);
+        const value = controlsEl.append('div').attr('class', 'control-value').text(spec.format(defaults[spec.key]));
+        input.on('input', (event) => {
+          let next = +event.target.value;
+          if (spec.integer) next = Math.round(next);
+          state[spec.key] = next;
+          value.text(spec.format(next));
+          render();
+        });
+        controlMap.set(spec.key, { input, value, spec });
+      }
+
+      function addButtons() {
+        if (config.showTruthToggle) {
+          addButton('truth', 'Hide truth', () => {
+            state.showTruth = !state.showTruth;
+            syncButtons();
+            render();
+          });
+        }
+
+        addButton('seed', 'New seed', () => {
+          state.seed += 1;
+          render();
+        });
+
+        addButton('reset', 'Reset', () => {
+          Object.assign(state, defaults);
+          controlMap.forEach(({ input, value, spec }, key) => {
+            input.property('value', defaults[key]);
+            value.text(spec.format(defaults[key]));
+          });
+          syncButtons();
+          render();
+        });
+
+        if (config.showDatasetButtons) {
+          [10, 30, 2000].forEach((count) => {
+            addButton(`datasets-${count}`, `${count} datasets`, () => {
+              state.datasets = count;
+              syncButtons();
+              render();
+            });
+          });
+        }
+
+        syncButtons();
+      }
+
+      function addButton(key, label, handler) {
+        buttonsEl.append('button')
+          .attr('type', 'button')
+          .attr('data-key', key)
+          .text(label)
+          .on('click', handler);
+      }
+
+      function syncButtons() {
+        buttonsEl.selectAll('button')
+          .classed('is-active', function() {
+            const key = this.getAttribute('data-key');
+            if (key === 'truth') return state.showTruth;
+            if (key === `datasets-${state.datasets}`) return true;
+            return false;
+          })
+          .text(function() {
+            const key = this.getAttribute('data-key');
+            if (key === 'truth') return state.showTruth ? 'Hide truth' : 'Show truth';
+            return this.textContent;
+          });
+      }
+
+      function render() {
+        const layoutWidth = document.body.clientWidth || 800;
+        const mainWidth = mainFrame.node().clientWidth || layoutWidth - 28;
+        const sideWidth = config.showSidebar ? Math.max(180, sideFrame.node().clientWidth || 220) : 0;
+        const chartHeight = Math.max(config.minHeight, Math.round(mainWidth * config.heightRatio));
+
+        const margin = { top: 54, right: 16, bottom: 72, left: 56 };
+        const innerWidth = Math.max(120, mainWidth - margin.left - margin.right);
+        const innerHeight = Math.max(200, chartHeight - margin.top - margin.bottom);
+
+        mainSvg.attr('viewBox', `0 0 ${mainWidth} ${chartHeight}`);
+        mainRoot.attr('transform', `translate(${margin.left},${margin.top})`);
+        axisX.attr('transform', `translate(0,${innerHeight})`);
+        titleLayer.selectAll('*').remove();
+
+        const dataset = mode === 'biasvariance'
+          ? computeBiasVarianceState(state)
+          : computeTrainingState(state, config.defaultValPct);
+
+        const yExtentSource = [
+          ...(dataset.yTruth || []),
+          ...(dataset.yPred || []),
+          ...(dataset.yTrain || []),
+          ...(dataset.yVal || []),
+          ...(dataset.varianceUpper || []),
+          ...(dataset.varianceLower || [])
+        ];
+        const yMin = d3v.min(yExtentSource);
+        const yMax = d3v.max(yExtentSource);
+        const yPad = Math.max(0.12 * ((yMax - yMin) || 1), 0.12);
+
+        const sx = d3v.scaleLinear().domain([constants.xmin, constants.xmax]).range([0, innerWidth]);
+        const sy = d3v.scaleLinear().domain([yMin - yPad, yMax + yPad]).range([innerHeight, 0]);
+
+        gridX.call(d3v.axisBottom(sx).ticks(7).tickSize(-innerHeight).tickFormat(''))
+          .attr('transform', `translate(0,${innerHeight})`);
+        gridY.call(d3v.axisLeft(sy).ticks(6).tickSize(-innerWidth).tickFormat(''));
+        axisX.call(d3v.axisBottom(sx).ticks(7));
+        axisY.call(d3v.axisLeft(sy).ticks(6));
+
+        const line = d3v.line().x((d) => sx(d.x)).y((d) => sy(d.y));
+        const area = d3v.area().x((d) => sx(d.x)).y0((d) => sy(d.y0)).y1((d) => sy(d.y1));
+
+        titleLayer.append('text')
+          .attr('x', mainWidth / 2)
+          .attr('y', 28)
+          .attr('text-anchor', 'middle')
+          .text(config.titleFormatter(dataset));
+
+        truthPath
+          .style('display', state.showTruth || mode === 'biasvariance' ? null : 'none')
+          .datum(constants.xPred.map((x, i) => ({ x, y: dataset.yTruth[i] })))
+          .attr('d', line);
+
+        predPath
+          .datum(constants.xPred.map((x, i) => ({ x, y: dataset.yPred[i] })))
+          .attr('d', line)
+          .attr('stroke', mode === 'biasvariance' ? constants.colorAccent : constants.colorPred);
+
+        if (mode === 'biasvariance') {
+          biasArea.style('display', null)
+            .datum(constants.xPred.map((x, i) => ({ x, y0: dataset.biasBottom[i], y1: dataset.biasTop[i] })))
+            .attr('d', area);
+          varianceLowerArea.style('display', null)
+            .datum(constants.xPred.map((x, i) => ({ x, y0: dataset.varianceLower[i], y1: dataset.biasBottom[i] })))
+            .attr('d', area);
+          varianceUpperArea.style('display', null)
+            .datum(constants.xPred.map((x, i) => ({ x, y0: dataset.biasTop[i], y1: dataset.varianceUpper[i] })))
+            .attr('d', area);
+        } else {
+          biasArea.style('display', 'none');
+          varianceLowerArea.style('display', 'none');
+          varianceUpperArea.style('display', 'none');
+        }
+
+        drawCrossGroup(dataGroup, dataset.xTrain, dataset.yTrain, constants.colorData, sx, sy, 4, 1.8, 1);
+        drawCrossGroup(validationGroup, dataset.xVal || [], dataset.yVal || [], constants.colorValidation, sx, sy, 4, 1.8, 1);
+
+        drawLegend(mainWidth, chartHeight, dataset);
+
+        axisLabelX
+          .attr('x', margin.left + innerWidth / 2)
+          .attr('y', chartHeight - 18)
+          .text('x');
+        axisLabelY
+          .attr('transform', `translate(18 ${margin.top + innerHeight / 2}) rotate(-90)`)
+          .text('t');
+
+        if (config.showSidebar) renderSidebar(sideWidth, chartHeight, dataset);
+      }
+
+      function renderSidebar(sideWidth, chartHeight, dataset) {
+        const sidebarWidth = Math.max(180, sideWidth || 220);
+        const margin = { top: 28, right: 14, bottom: 58, left: 48 };
+        const innerWidth = Math.max(80, sidebarWidth - margin.left - margin.right);
+        const innerHeight = Math.max(150, chartHeight - margin.top - margin.bottom);
+        const upper = Math.max(1.5, dataset.mseTrain, dataset.mseValidation || 0) * 1.12;
+
+        sideSvg.attr('viewBox', `0 0 ${sidebarWidth} ${chartHeight}`);
+        sideRoot.attr('transform', `translate(${margin.left},${margin.top})`);
+        sideAxisX.attr('transform', `translate(0,${innerHeight})`);
+
+        const sx = d3v.scalePoint().domain(['Training', 'Validation']).range([0, innerWidth]).padding(0.5);
+        const sy = d3v.scaleLinear().domain([-0.05, upper]).range([innerHeight, 0]);
+
+        sideGridY.call(d3v.axisLeft(sy).ticks(6).tickSize(-innerWidth).tickFormat(''));
+        sideAxisY.call(d3v.axisLeft(sy).ticks(6));
+        sideAxisX.call(d3v.axisBottom(sx));
+
+        sideTrainPoint
+          .attr('cx', sx('Training'))
+          .attr('cy', sy(dataset.mseTrain));
+
+        if (dataset.xVal && dataset.xVal.length > 0) {
+          sideValidationPoint
+            .style('display', null)
+            .attr('cx', sx('Validation'))
+            .attr('cy', sy(dataset.mseValidation));
+        } else {
+          sideValidationPoint.style('display', 'none');
+        }
+
+        sideLabelY
+          .attr('transform', `translate(16 ${margin.top + innerHeight / 2}) rotate(-90)`)
+          .text('Mean Squared Error');
+
+        sideLegend.selectAll('*').remove();
+        const items = [
+          { label: 'Training error', color: constants.colorData }
+        ];
+        if (dataset.xVal && dataset.xVal.length > 0) items.push({ label: 'Validation error', color: constants.colorValidation });
+        items.forEach((item, i) => {
+          const group = sideLegend.append('g').attr('transform', `translate(${12}, ${18 + i * 18})`);
+          group.append('circle').attr('cx', 5).attr('cy', 0).attr('r', 4).attr('fill', item.color);
+          group.append('text').attr('x', 16).attr('y', 4).text(item.label);
+        });
+      }
+
+      function drawLegend(width, height, dataset) {
+        legendLayer.selectAll('*').remove();
+        const items = [];
+        if (mode === 'biasvariance') {
+          items.push(
+            { label: 'Ground truth f(x)', color: constants.colorTruth, type: 'line' },
+            { label: `E_D[y(x)] (k=${state.k})`, color: constants.colorAccent, type: 'line' },
+            { label: 'Bias', color: constants.colorBias, type: 'box', opacity: 0.55 },
+            { label: 'Variance (95% confidence)', color: constants.colorBias, type: 'box', opacity: 0.22 }
+          );
+        } else {
+          if (state.showTruth) items.push({ label: 'Ground truth f(x)', color: constants.colorTruth, type: 'line' });
+          items.push(
+            { label: 'Training data (x,t)', color: constants.colorData, type: 'cross' },
+            { label: `Prediction y(x), k=${state.k}`, color: constants.colorPred, type: 'line' }
+          );
+          if (dataset.xVal && dataset.xVal.length > 0) items.push({ label: 'Validation data (x,t)', color: constants.colorValidation, type: 'cross' });
+        }
+
+        let cursorX = 14;
+        const y = height - 18;
+        items.forEach((item) => {
+          const group = legendLayer.append('g').attr('transform', `translate(${cursorX},${y})`);
+          if (item.type === 'line') {
+            group.append('line').attr('x1', 0).attr('x2', 22).attr('y1', 0).attr('y2', 0).attr('stroke', item.color).attr('stroke-width', 2.2);
+          } else if (item.type === 'cross') {
+            group.append('path').attr('d', 'M 3 -4 L 11 4 M 3 4 L 11 -4').attr('stroke', item.color).attr('stroke-width', 2).attr('fill', 'none');
+          } else if (item.type === 'box') {
+            group.append('rect').attr('x', 0).attr('y', -5).attr('width', 14).attr('height', 10).attr('fill', item.color).attr('opacity', item.opacity || 1).attr('rx', 2);
+          }
+          group.append('text').attr('x', 28).attr('y', 4).text(item.label);
+          cursorX += Math.max(125, item.label.length * 6.5 + 46);
+        });
+      }
+
+      function drawCrossGroup(group, xs, ys, color, sx, sy, radius, strokeWidth, opacity) {
+        const data = xs.map((x, i) => ({ x, y: ys[i] }));
+        group.selectAll('path')
+          .data(data)
+          .join(
+            (enter) => enter.append('path').attr('fill', 'none'),
+            (update) => update,
+            (exit) => exit.remove()
+          )
+          .attr('stroke', color)
+          .attr('stroke-width', strokeWidth)
+          .attr('opacity', opacity)
+          .attr('d', (d) => {
+            const px = sx(d.x);
+            const py = sy(d.y);
+            return `M ${px - radius} ${py - radius} L ${px + radius} ${py + radius} M ${px - radius} ${py + radius} L ${px + radius} ${py - radius}`;
+          });
+      }
+
+      function computeTrainingState(state, valPct) {
+        const data = generateData({ epsilon: state.epsilon, N: state.N, freq: state.freq, seed: state.seed });
+        const split = splitData(data.x, data.y, valPct, state.seed);
+        const k = Math.max(1, Math.min(state.k, split.xTrain.length));
+        const yPred = knnPredict(split.xTrain, split.yTrain, constants.xPred, k);
+        const trainPred = knnPredict(split.xTrain, split.yTrain, split.xTrain, k);
+        const valPred = split.xVal.length ? knnPredict(split.xTrain, split.yTrain, split.xVal, k) : [];
+        return {
+          xTrain: split.xTrain,
+          yTrain: split.yTrain,
+          xVal: split.xVal,
+          yVal: split.yVal,
+          yPred,
+          yTruth: constants.xPred.map((x) => fTruth(x, state.freq)),
+          mseTrain: mse(split.yTrain, trainPred),
+          mseValidation: split.xVal.length ? mse(split.yVal, valPred) : 0
+        };
+      }
+
+      function computeBiasVarianceState(state) {
+        const D = state.datasets;
+        const N = state.N;
+        const k = Math.max(1, Math.min(state.k, N));
+        const yTruth = constants.xPred.map((x) => fTruth(x, state.freq));
+        const preds = [];
+        const yMean = new Array(constants.xPred.length).fill(0);
+
+        for (let i = 0; i < D; i += 1) {
+          const seed = state.seed + (i + 1) * D;
+          const data = generateData({ epsilon: state.epsilon, N: state.N, freq: state.freq, seed });
+          const pred = knnPredict(data.x, data.y, constants.xPred, k);
+          preds.push(pred);
+          for (let j = 0; j < pred.length; j += 1) yMean[j] += pred[j] / D;
+        }
+
+        const variance = new Array(constants.xPred.length).fill(0);
+        for (let i = 0; i < preds.length; i += 1) {
+          for (let j = 0; j < preds[i].length; j += 1) {
+            const diff = preds[i][j] - yMean[j];
+            variance[j] += (diff * diff) / D;
+          }
+        }
+
+        const biasBottom = yMean.map((v, i) => Math.min(v, yTruth[i]));
+        const biasTop = yMean.map((v, i) => Math.max(v, yTruth[i]));
+        const varianceLower = biasBottom.map((v, i) => v - 2 * Math.sqrt(variance[i]));
+        const varianceUpper = biasTop.map((v, i) => v + 2 * Math.sqrt(variance[i]));
+
+        return {
+          xTrain: [],
+          yTrain: [],
+          xVal: [],
+          yVal: [],
+          yPred: yMean,
+          yTruth,
+          biasBottom,
+          biasTop,
+          varianceLower,
+          varianceUpper,
+          mseTrain: 0,
+          mseValidation: 0,
+          datasets: D
+        };
+      }
+
+      function splitData(x, y, valPct, seed) {
+        if (!valPct) {
+          return { xTrain: x.slice(), yTrain: y.slice(), xVal: [], yVal: [] };
+        }
+        const indices = d3v.range(x.length);
+        seededShuffle(indices, seed + 1009);
+        const splitAt = Math.ceil(x.length * (1 - valPct / 100));
+        const trainIdx = indices.slice(0, splitAt);
+        const valIdx = indices.slice(splitAt);
+        return {
+          xTrain: trainIdx.map((i) => x[i]),
+          yTrain: trainIdx.map((i) => y[i]),
+          xVal: valIdx.map((i) => x[i]),
+          yVal: valIdx.map((i) => y[i])
+        };
+      }
+
+      function generateData({ epsilon, N, freq, seed }) {
+        const x = d3v.range(Math.max(1, N)).map((i) => {
+          if (N === 1) return constants.xmin;
+          return constants.xmin + (constants.xmax - constants.xmin) * i / (N - 1);
+        });
+        const rng = mulberry32((seed >>> 0) + 1);
+        const y = x.map((xi) => fTruth(xi, freq) + epsilon * randn(rng));
+        return { x, y };
+      }
+
+      function knnPredict(xTrain, yTrain, xQuery, k) {
+        const kk = Math.max(1, Math.min(k, xTrain.length));
+        return xQuery.map((xq) => {
+          const ranked = d3v.range(xTrain.length)
+            .sort((a, b) => Math.abs(xTrain[a] - xq) - Math.abs(xTrain[b] - xq))
+            .slice(0, kk);
+          let sum = 0;
+          ranked.forEach((idx) => { sum += yTrain[idx]; });
+          return sum / kk;
+        });
+      }
+
+      function mse(yTrue, yPred) {
+        if (!yTrue.length || !yPred.length) return 0;
+        let acc = 0;
+        for (let i = 0; i < yTrue.length; i += 1) {
+          const diff = yTrue[i] - yPred[i];
+          acc += diff * diff;
+        }
+        return acc / yTrue.length;
+      }
+
+      function fTruth(x, freq) {
+        return Math.sin(freq * x);
+      }
+
+      function seededShuffle(array, seed) {
+        const rng = mulberry32(seed >>> 0);
+        for (let i = array.length - 1; i > 0; i -= 1) {
+          const j = Math.floor(rng() * (i + 1));
+          const tmp = array[i];
+          array[i] = array[j];
+          array[j] = tmp;
+        }
+        return array;
+      }
+
+      function mulberry32(a) {
+        return function() {
+          let t = (a += 0x6D2B79F5);
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function randn(rng) {
+        let u = 0;
+        let v = 0;
+        while (u === 0) u = rng();
+        while (v === 0) v = rng();
+        return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+      }
+
+      function formatFixed(value, digits) {
+        return Number(value).toFixed(digits);
+      }
+
+      function formatTrimmed(value, digits) {
+        return Number(value).toFixed(digits).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+      }
+
+      function getCSS(name) {
+        return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      }
+
+      new ResizeObserver(() => render()).observe(document.body);
+      render();
+    })();
+  </script>
+</body>
+</html>
