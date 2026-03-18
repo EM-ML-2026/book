@@ -531,15 +531,6 @@
           .text('Mean Squared Error');
 
         sideLegend.selectAll('*').remove();
-        const items = [
-          { label: 'Training error', color: constants.colorData }
-        ];
-        if (dataset.xVal && dataset.xVal.length > 0) items.push({ label: 'Validation error', color: constants.colorValidation });
-        items.forEach((item, i) => {
-          const group = sideLegend.append('g').attr('transform', `translate(${12}, ${18 + i * 18})`);
-          group.append('circle').attr('cx', 5).attr('cy', 0).attr('r', 4).attr('fill', item.color);
-          group.append('text').attr('x', 16).attr('y', 4).text(item.label);
-        });
       }
 
       function drawLegend(width, height, dataset) {
@@ -561,9 +552,18 @@
           if (dataset.xVal && dataset.xVal.length > 0) items.push({ label: 'Validation data (x,t)', color: constants.colorValidation, type: 'cross' });
         }
 
+        const fontSize = mode === 'validation' ? 11 : 12;
+        const rowHeight = mode === 'validation' ? 16 : 18;
+        const rowLimit = width - 18;
         let cursorX = 14;
-        const y = height - 18;
+        let row = 0;
         items.forEach((item) => {
+          const itemWidth = Math.max(mode === 'validation' ? 92 : 125, item.label.length * (mode === 'validation' ? 5.7 : 6.5) + 42);
+          if (mode === 'validation' && cursorX + itemWidth > rowLimit) {
+            cursorX = 14;
+            row += 1;
+          }
+          const y = height - 18 - row * rowHeight;
           const group = legendLayer.append('g').attr('transform', `translate(${cursorX},${y})`);
           if (item.type === 'line') {
             group.append('line').attr('x1', 0).attr('x2', 22).attr('y1', 0).attr('y2', 0).attr('stroke', item.color).attr('stroke-width', 2.2);
@@ -572,8 +572,8 @@
           } else if (item.type === 'box') {
             group.append('rect').attr('x', 0).attr('y', -5).attr('width', 14).attr('height', 10).attr('fill', item.color).attr('opacity', item.opacity || 1).attr('rx', 2);
           }
-          group.append('text').attr('x', 28).attr('y', 4).text(item.label);
-          cursorX += Math.max(125, item.label.length * 6.5 + 46);
+          group.append('text').attr('x', 28).attr('y', 4).style('font-size', `${fontSize}px`).text(item.label);
+          cursorX += itemWidth;
         });
       }
 
