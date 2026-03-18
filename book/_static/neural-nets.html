@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neural network widget</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <style>
+    :root {
+      --c-truth: #111111;
+      --c-data: #0076c2;
+      --c-pred: #ec6842;
+      --c-validation: #6f1d77;
+      --c-accent: #009b77;
+      --c-grid: #d9dee5;
+      --c-axis: #5c6570;
+      --c-border: #dde3ea;
+      --c-muted: #5f6b7a;
+      --c-surface: #ffffff;
+      --c-surface-soft: #f7f9fb;
+      --c-run: #a50034;
+      --c-node: #ffb81c;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #1b1f24;
+      background: var(--c-surface);
+    }
+
+    body { padding: 0; }
+
+    .widget-shell {
+      width: 100%;
+      max-width: 100%;
+      padding: 12px;
+      margin: 0 auto;
+      background: var(--c-surface);
+    }
+
+    .widget-card {
+      width: 100%;
+      border: 1px solid var(--c-border);
+      border-radius: 12px;
+      background: var(--c-surface);
+      box-shadow: 0 1px 3px rgba(12, 35, 64, 0.06);
+      overflow: hidden;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(160px, 220px) 1fr 70px;
+      gap: 10px 12px;
+      padding: 12px 14px 8px;
+      align-items: center;
+      background: var(--c-surface-soft);
+      border-bottom: 1px solid #edf1f5;
+    }
+
+    .control-label {
+      font-size: 0.94rem;
+      color: #243140;
+    }
+
+    .control-value {
+      text-align: right;
+      color: var(--c-muted);
+      font-variant-numeric: tabular-nums;
+      font-size: 0.84rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--c-data);
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px 14px 8px;
+      background: var(--c-surface-soft);
+      border-bottom: 1px solid #edf1f5;
+    }
+
+    button {
+      border: 1px solid #cfd7e3;
+      background: #ffffff;
+      color: #243140;
+      border-radius: 999px;
+      padding: 7px 12px;
+      cursor: pointer;
+      font-size: 0.86rem;
+      line-height: 1.2;
+      transition: background 120ms ease, border-color 120ms ease, transform 120ms ease, color 120ms ease;
+    }
+
+    button:hover {
+      background: #f5f8fc;
+      border-color: #b9c7d8;
+    }
+
+    button:active { transform: translateY(1px); }
+
+    button.is-active {
+      background: #eef5fb;
+      border-color: #7cb3df;
+      color: #0f4b75;
+      font-weight: 600;
+    }
+
+    button.is-warning {
+      background: #fff1f5;
+      border-color: #d87a97;
+      color: #8f1d42;
+      font-weight: 600;
+    }
+
+    button.is-running {
+      background: #edf8f3;
+      border-color: #79bc98;
+      color: #12633c;
+      font-weight: 600;
+      cursor: progress;
+    }
+
+    .radio-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 0 14px 10px;
+      background: var(--c-surface-soft);
+      border-bottom: 1px solid #edf1f5;
+    }
+
+    .radio-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border: 1px solid #cfd7e3;
+      border-radius: 999px;
+      background: #fff;
+      color: #243140;
+      font-size: 0.84rem;
+      cursor: pointer;
+    }
+
+    .radio-chip input { margin: 0; }
+
+    .chart-panel {
+      padding: 10px;
+      background: #ffffff;
+    }
+
+    .chart-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .chart-stack {
+      display: grid;
+      grid-template-rows: auto auto auto;
+      gap: 12px;
+    }
+
+    .chart-frame {
+      width: 100%;
+      border: 1px solid var(--c-border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    .chart-frame svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .frame-hidden { display: none; }
+
+    .axis path, .axis line { stroke: var(--c-axis); }
+    .grid line { stroke: var(--c-grid); stroke-opacity: 0.85; }
+    .grid path { display: none; }
+    .legend text, .axis text { font-family: inherit; }
+    .legend text { font-size: 12px; fill: #243140; }
+    .axis text { font-size: 12px; fill: #44505d; }
+    .axis-label { font-size: 13px; fill: #243140; }
+    .annotation { font-size: 12px; fill: #5f6b7a; }
+
+    @media (max-width: 840px) {
+      .chart-layout { grid-template-columns: 1fr; }
+      .chart-stack { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); grid-template-rows: none; }
+    }
+
+    @media (max-width: 640px) {
+      .widget-shell { padding: 8px; }
+      .controls { grid-template-columns: 1fr; gap: 6px; }
+      .control-value { text-align: left; margin-top: -4px; margin-bottom: 4px; }
+      .chart-stack { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="widget-shell">
+    <div class="widget-card">
+      <div class="controls" id="controls"></div>
+      <div class="button-row" id="buttons"></div>
+      <div class="radio-row" id="activation-row"></div>
+      <div class="chart-panel">
+        <div class="chart-layout">
+          <div class="chart-frame" id="main-frame"></div>
+          <div class="chart-stack">
+            <div class="chart-frame" id="loss-frame"></div>
+            <div class="chart-frame" id="network-frame"></div>
+            <div class="chart-frame" id="activation-frame"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const d3v = window.d3;
+      if (!d3v) return;
+
+      const params = new URLSearchParams(window.location.search);
+      const mode = (params.get('mode') || 'flexibility').toLowerCase();
+
+      const baseDefaults = {
+        epsilon: 0.4,
+        N: 60,
+        freq: 3.4,
+        neurons: 20,
+        epochs: 10000,
+        epochBlocks: 200,
+        batchSize: 5,
+        valPct: 30,
+        activation: 'tanh',
+        seed: 0,
+        curModel: 200,
+        lrMultiplier: 1,
+        showTruth: true
+      };
+
+      const MODES = {
+        flexibility: {
+          controls: ['neurons'],
+          showCurModel: false,
+          showActivationSelector: false,
+          defaults: { N: 100, valPct: 60, epochs: 20000, neurons: 3, seed: 0, batchSize: 5, activation: 'tanh' }
+        },
+        selection: {
+          controls: ['curModel'],
+          showCurModel: true,
+          showActivationSelector: false,
+          defaults: { N: 25, valPct: 60, epochs: 50000, neurons: 30, seed: 0, batchSize: 2, activation: 'tanh', lrMultiplier: 2.0, freq: 1.5 }
+        },
+        playground: {
+          controls: ['freq', 'neurons', 'N', 'curModel', 'valPct'],
+          showCurModel: true,
+          showActivationSelector: true,
+          defaults: { N: 60, valPct: 30, epochs: 50000, neurons: 20, seed: 0, batchSize: 5, activation: 'tanh', freq: 3.4 }
+        }
+      };
+
+      const config = MODES[mode] || MODES.flexibility;
+      const defaults = { ...baseDefaults, ...config.defaults };
+      const state = { ...defaults };
+
+      const constants = {
+        xmin: 0,
+        xmax: 2 * Math.PI,
+        xPredMin: -1,
+        xPredMax: 2 * Math.PI + 1,
+        xPred: d3v.range(200).map(i => -1 + ((2 * Math.PI + 2) * i) / 199),
+        xDense: d3v.range(1500).map(i => (2 * Math.PI * i) / 1499),
+        colorTruth: getCSS('--c-truth'),
+        colorData: getCSS('--c-data'),
+        colorPred: getCSS('--c-pred'),
+        colorValidation: getCSS('--c-validation'),
+        colorAccent: getCSS('--c-accent'),
+        colorNode: getCSS('--c-node'),
+        xMean: Math.PI,
+        xStd: (() => {
+          const xs = d3v.range(100).map(i => (2 * Math.PI * i) / 99);
+          const mean = d3v.mean(xs);
+          const variance = d3v.mean(xs.map(x => (x - mean) ** 2));
+          return Math.sqrt(variance);
+        })()
+      };
+
+      const controlSpecs = {
+        freq: { key: 'freq', label: 'Frequency (freq)', min: 1, max: 5, step: 0.01, format: v => formatTrimmed(v, 2), passive: true },
+        neurons: { key: 'neurons', label: 'Neurons / layer', min: 1, max: 20, step: 1, format: v => `${Math.round(v)}`, integer: true, passive: true },
+        N: { key: 'N', label: 'Training size (N)', min: 2, max: 200, step: 1, format: v => `${Math.round(v)}`, integer: true, passive: true },
+        curModel: { key: 'curModel', label: 'Selected model', min: 1, max: 200, step: 1, format: v => `${Math.round(v)}`, integer: true, passive: false },
+        valPct: { key: 'valPct', label: 'Validation size (%)', min: 0, max: 60, step: 5, format: v => `${Math.round(v)}%`, integer: true, passive: true }
+      };
+
+      const controlsEl = d3v.select('#controls');
+      const buttonsEl = d3v.select('#buttons');
+      const activationRow = d3v.select('#activation-row');
+      const activationFrame = d3v.select('#activation-frame');
+      const controlMap = new Map();
+
+      config.controls.forEach((key) => addControl(controlSpecs[key]));
+      addButtons();
+      buildActivationSelector();
+
+      if (!config.showActivationSelector) {
+        activationRow.classed('frame-hidden', true);
+        activationFrame.classed('frame-hidden', true);
+      }
+
+      const mainFrame = d3v.select('#main-frame');
+      const lossFrame = d3v.select('#loss-frame');
+      const networkFrame = d3v.select('#network-frame');
+
+      const mainSvg = mainFrame.append('svg');
+      const lossSvg = lossFrame.append('svg');
+      const networkSvg = networkFrame.append('svg');
+      const activationSvg = activationFrame.append('svg');
+
+      const mainRoot = mainSvg.append('g');
+      const mainGridX = mainRoot.append('g').attr('class', 'grid');
+      const mainGridY = mainRoot.append('g').attr('class', 'grid');
+      const mainAxisX = mainRoot.append('g').attr('class', 'axis');
+      const mainAxisY = mainRoot.append('g').attr('class', 'axis');
+      const truthPath = mainRoot.append('path').attr('fill', 'none').attr('stroke', constants.colorTruth).attr('stroke-width', 2.2);
+      const predPath = mainRoot.append('path').attr('fill', 'none').attr('stroke', constants.colorPred).attr('stroke-width', 2.4);
+      const dataGroup = mainRoot.append('g');
+      const valGroup = mainRoot.append('g');
+      const legendLayer = mainSvg.append('g').attr('class', 'legend');
+      const mainLabelX = mainSvg.append('text').attr('class', 'axis-label').attr('text-anchor', 'middle');
+      const mainLabelY = mainSvg.append('text').attr('class', 'axis-label').attr('text-anchor', 'middle');
+      const mainStatus = mainSvg.append('text').attr('class', 'annotation').attr('text-anchor', 'end');
+
+      const lossRoot = lossSvg.append('g');
+      const lossGridY = lossRoot.append('g').attr('class', 'grid');
+      const lossAxisX = lossRoot.append('g').attr('class', 'axis');
+      const lossAxisY = lossRoot.append('g').attr('class', 'axis');
+      const trainLossPath = lossRoot.append('path').attr('fill', 'none').attr('stroke', constants.colorData).attr('stroke-width', 2.1);
+      const valLossPath = lossRoot.append('path').attr('fill', 'none').attr('stroke', constants.colorValidation).attr('stroke-width', 2.1);
+      const trueLossPath = lossRoot.append('path').attr('fill', 'none').attr('stroke', constants.colorTruth).attr('stroke-width', 1.9);
+      const currentEpochLine = lossRoot.append('line').attr('stroke', '#0c2340').attr('stroke-dasharray', '6,5').attr('stroke-width', 1.4);
+      const lossLegend = lossSvg.append('g').attr('class', 'legend');
+      const lossLabelX = lossSvg.append('text').attr('class', 'axis-label').attr('text-anchor', 'middle');
+      const lossLabelY = lossSvg.append('text').attr('class', 'axis-label').attr('text-anchor', 'middle');
+
+      const networkRoot = networkSvg.append('g');
+      
+      const runtime = {
+        data: null,
+        trainedModels: [],
+        trainingRMSE: [],
+        validationRMSE: [],
+        trueRMSE: [],
+        selectedPrediction: null,
+        lastEpochsPerBlock: Math.ceil(state.epochs / state.epochBlocks),
+        dirty: true,
+        running: false,
+        hasTrained: false
+      };
+
+      regenerateData();
+      syncButtons();
+      render();
+
+      async function runTraining() {
+        if (runtime.running) return;
+        runtime.running = true;
+        runtime.dirty = false;
+        runtime.hasTrained = false;
+        runtime.trainedModels = [];
+        runtime.trainingRMSE = [];
+        runtime.validationRMSE = [];
+        runtime.trueRMSE = [];
+        runtime.selectedPrediction = null;
+        syncButtons();
+        render();
+
+        const trainState = createTrainingState(state, runtime.data);
+        const epochsPerBlock = Math.max(1, Math.ceil(state.epochs / state.epochBlocks));
+        runtime.lastEpochsPerBlock = epochsPerBlock;
+        const checkpointIndices = [];
+        const totalBlocks = state.epochBlocks;
+
+        for (let block = 0; block < totalBlocks; block += 1) {
+          for (let epoch = 0; epoch < epochsPerBlock; epoch += 1) {
+            trainOneEpoch(trainState);
+          }
+
+          const yPred = predictSeries(trainState.net, constants.xPred);
+          const trainPred = predictSeries(trainState.net, runtime.data.xTrain);
+          const trainRmse = rmse(runtime.data.yTrain, trainPred);
+          const truePred = predictSeries(trainState.net, constants.xDense);
+          const trueRmse = rmse(runtime.data.yDense, truePred);
+
+          runtime.trainedModels.push(yPred);
+          runtime.trainingRMSE.push(trainRmse);
+          runtime.trueRMSE.push(trueRmse);
+          checkpointIndices.push((block + 1) * epochsPerBlock);
+
+          if (runtime.data.xVal.length > 0) {
+            const valPred = predictSeries(trainState.net, runtime.data.xVal);
+            runtime.validationRMSE.push(rmse(runtime.data.yVal, valPred));
+          }
+
+          if (block === totalBlocks - 1 || block % 3 === 0) {
+            runtime.hasTrained = true;
+            if (!config.showCurModel) {
+              runtime.selectedPrediction = runtime.trainedModels[runtime.trainedModels.length - 1];
+            } else {
+              const idx = clampModelIndex(state.curModel);
+              runtime.selectedPrediction = runtime.trainedModels[idx] || runtime.trainedModels[runtime.trainedModels.length - 1];
+            }
+            render(checkpointIndices);
+            // keep the UI responsive during longer runs
+            await new Promise(requestAnimationFrame);
+          }
+        }
+
+        runtime.hasTrained = true;
+        if (!config.showCurModel) {
+          runtime.selectedPrediction = runtime.trainedModels[runtime.trainedModels.length - 1];
+        } else {
+          const idx = clampModelIndex(state.curModel);
+          runtime.selectedPrediction = runtime.trainedModels[idx] || runtime.trainedModels[runtime.trainedModels.length - 1];
+        }
+        runtime.running = false;
+        syncButtons();
+        render(checkpointIndices);
+      }
+
+      function addControl(spec) {
+        controlsEl.append('label').attr('class', 'control-label').attr('for', `control-${spec.key}`).text(spec.label);
+        const input = controlsEl.append('input')
+          .attr('id', `control-${spec.key}`)
+          .attr('type', 'range')
+          .attr('min', spec.min)
+          .attr('max', spec.max)
+          .attr('step', spec.step)
+          .property('value', state[spec.key]);
+        const value = controlsEl.append('div').attr('class', 'control-value').text(spec.format(state[spec.key]));
+
+        input.on('input', (event) => {
+          let next = +event.target.value;
+          if (spec.integer) next = Math.round(next);
+          state[spec.key] = next;
+          value.text(spec.format(next));
+
+          if (spec.key === 'curModel') {
+            if (runtime.trainedModels.length > 0) {
+              runtime.selectedPrediction = runtime.trainedModels[clampModelIndex(next)] || runtime.selectedPrediction;
+            }
+            render();
+            return;
+          }
+
+          markDirty();
+          if (spec.key === 'neurons') render();
+          else if (spec.key === 'freq' || spec.key === 'N' || spec.key === 'valPct') {
+            regenerateData();
+            render();
+          } else {
+            render();
+          }
+        });
+
+        controlMap.set(spec.key, { input, value, spec });
+      }
+
+      function addButtons() {
+        addButton('truth', 'Hide truth', () => {
+          state.showTruth = !state.showTruth;
+          syncButtons();
+          render();
+        });
+
+        addButton('seed', 'New seed', () => {
+          state.seed += 1;
+          regenerateData();
+          markDirty();
+          syncButtons();
+          render();
+        });
+
+        addButton('reset', 'Reset', () => {
+          Object.assign(state, defaults);
+          controlMap.forEach(({ input, value, spec }, key) => {
+            input.property('value', state[key]);
+            value.text(spec.format(state[key]));
+          });
+          activationRow.selectAll('input').property('checked', function() {
+            return this.value === state.activation;
+          });
+          regenerateData();
+          markDirty();
+          syncButtons();
+          render();
+        });
+
+        addButton('run', 'Run', () => {
+          runTraining();
+        });
+      }
+
+      function addButton(key, label, handler) {
+        buttonsEl.append('button')
+          .attr('type', 'button')
+          .attr('data-key', key)
+          .text(label)
+          .on('click', handler);
+      }
+
+      function buildActivationSelector() {
+        if (!config.showActivationSelector) return;
+        ['identity', 'relu', 'tanh'].forEach((name) => {
+          const chip = activationRow.append('label').attr('class', 'radio-chip');
+          chip.append('input')
+            .attr('type', 'radio')
+            .attr('name', 'activation')
+            .attr('value', name)
+            .property('checked', state.activation === name)
+            .on('change', function() {
+              state.activation = this.value;
+              markDirty();
+              render();
+            });
+          chip.append('span').text(name);
+        });
+      }
+
+      function syncButtons() {
+        buttonsEl.selectAll('button')
+          .classed('is-active', function() {
+            const key = this.getAttribute('data-key');
+            return key === 'truth' && state.showTruth;
+          })
+          .classed('is-warning', function() {
+            return this.getAttribute('data-key') === 'run' && runtime.dirty && !runtime.running;
+          })
+          .classed('is-running', function() {
+            return this.getAttribute('data-key') === 'run' && runtime.running;
+          })
+          .text(function() {
+            const key = this.getAttribute('data-key');
+            if (key === 'truth') return state.showTruth ? 'Hide truth' : 'Show truth';
+            if (key === 'run') {
+              if (runtime.running) return 'Running';
+              if (runtime.hasTrained && runtime.dirty) return 'Re-run';
+              if (runtime.hasTrained) return 'Finished';
+              return 'Run';
+            }
+            return this.textContent;
+          });
+      }
+
+      function markDirty() {
+        runtime.dirty = true;
+        if (runtime.hasTrained && config.showCurModel && runtime.trainedModels.length > 0) {
+          runtime.selectedPrediction = runtime.trainedModels[clampModelIndex(state.curModel)] || runtime.selectedPrediction;
+        }
+        syncButtons();
+      }
+
+      function regenerateData() {
+        runtime.data = computeDataState(state);
+      }
+
+      function render(checkpointIndices = null) {
+        renderMainChart();
+        renderLossChart(checkpointIndices);
+        renderNetworkDiagram();
+        renderActivationChart();
+      }
+
+      function renderMainChart() {
+        const width = Math.max(520, mainFrame.node().clientWidth || 520);
+        const height = Math.max(420, Math.round(width * 0.62));
+        const margin = { top: 18, right: 16, bottom: 54, left: 52 };
+        const innerWidth = width - margin.left - margin.right;
+        const innerHeight = height - margin.top - margin.bottom;
+
+        mainSvg.attr('viewBox', `0 0 ${width} ${height}`);
+        mainRoot.attr('transform', `translate(${margin.left},${margin.top})`);
+        mainAxisX.attr('transform', `translate(0,${innerHeight})`);
+
+        const yPred = runtime.selectedPrediction || [];
+        const ySeries = [
+          ...runtime.data.yTruthPred,
+          ...runtime.data.yTrain,
+          ...runtime.data.yVal,
+          ...yPred
+        ];
+        const yMin = d3v.min(ySeries);
+        const yMax = d3v.max(ySeries);
+        const yPad = Math.max(0.15, ((yMax - yMin) || 1) * 0.12);
+
+        const sx = d3v.scaleLinear().domain([constants.xPredMin, constants.xPredMax]).range([0, innerWidth]);
+        const sy = d3v.scaleLinear().domain([yMin - yPad, yMax + yPad]).range([innerHeight, 0]);
+
+        mainGridX.call(d3v.axisBottom(sx).ticks(7).tickSize(-innerHeight).tickFormat('')).attr('transform', `translate(0,${innerHeight})`);
+        mainGridY.call(d3v.axisLeft(sy).ticks(6).tickSize(-innerWidth).tickFormat(''));
+        mainAxisX.call(d3v.axisBottom(sx).ticks(7));
+        mainAxisY.call(d3v.axisLeft(sy).ticks(6));
+
+        const line = d3v.line().x((d) => sx(d.x)).y((d) => sy(d.y));
+
+        truthPath
+          .style('display', state.showTruth ? null : 'none')
+          .datum(constants.xPred.map((x, i) => ({ x, y: runtime.data.yTruthPred[i] })))
+          .attr('d', line);
+
+        predPath
+          .style('display', yPred.length ? null : 'none')
+          .datum(constants.xPred.map((x, i) => ({ x, y: yPred[i] ?? NaN })))
+          .attr('d', line);
+
+        drawCrossGroup(dataGroup, runtime.data.xTrain, runtime.data.yTrain, constants.colorData, sx, sy, 4.2, 1.8);
+        drawCrossGroup(valGroup, runtime.data.xVal, runtime.data.yVal, constants.colorValidation, sx, sy, 4.2, 1.8);
+
+        mainLabelX
+          .attr('x', margin.left + innerWidth / 2)
+          .attr('y', height - 16)
+          .text('x');
+        mainLabelY
+          .attr('transform', `translate(18 ${margin.top + innerHeight / 2}) rotate(-90)`)
+          .text('t');
+        mainStatus
+          .attr('x', width - 18)
+          .attr('y', 20)
+          .text(runtime.running ? 'Training…' : runtime.dirty ? 'Click Run to update prediction' : '');
+
+        drawLegend(legendLayer, [
+          { label: 'Ground truth f(x)', color: constants.colorTruth, visible: state.showTruth },
+          { label: 'Training data (x, t)', color: constants.colorData, visible: true, cross: true },
+          { label: 'Validation data (x, t)', color: constants.colorValidation, visible: runtime.data.xVal.length > 0, cross: true },
+          { label: 'Prediction y(x)', color: constants.colorPred, visible: yPred.length > 0 }
+        ], width, margin.top, margin.left + 8);
+      }
+
+      function renderLossChart(checkpointIndices = null) {
+        const width = Math.max(240, lossFrame.node().clientWidth || 240);
+        const height = 260;
+        const margin = { top: 18, right: 14, bottom: 48, left: 48 };
+        const innerWidth = width - margin.left - margin.right;
+        const innerHeight = height - margin.top - margin.bottom;
+
+        lossSvg.attr('viewBox', `0 0 ${width} ${height}`);
+        lossRoot.attr('transform', `translate(${margin.left},${margin.top})`);
+        lossAxisX.attr('transform', `translate(0,${innerHeight})`);
+
+        const epochsPerBlock = runtime.lastEpochsPerBlock;
+        const xs = (checkpointIndices && checkpointIndices.length === runtime.trainingRMSE.length)
+          ? checkpointIndices
+          : runtime.trainingRMSE.map((_, i) => (i + 1) * epochsPerBlock);
+
+        const yAll = [
+          ...runtime.trainingRMSE,
+          ...runtime.validationRMSE,
+          ...runtime.trueRMSE,
+          0.6
+        ];
+        const yUpper = Math.max(1.25, (d3v.max(yAll) || 1) * 1.1);
+        const sx = d3v.scaleLinear().domain([0, Math.max(state.epochs, 1)]).range([0, innerWidth]);
+        const sy = d3v.scaleLinear().domain([0, yUpper]).range([innerHeight, 0]);
+
+        lossGridY.call(d3v.axisLeft(sy).ticks(5).tickSize(-innerWidth).tickFormat(''));
+        lossAxisX.call(d3v.axisBottom(sx).ticks(4).tickFormat(d3v.format('~s')));
+        lossAxisY.call(d3v.axisLeft(sy).ticks(5));
+
+        const line = d3v.line().x((d) => sx(d.x)).y((d) => sy(d.y));
+        trainLossPath
+          .style('display', runtime.trainingRMSE.length ? null : 'none')
+          .datum(xs.map((x, i) => ({ x, y: runtime.trainingRMSE[i] })))
+          .attr('d', line);
+        valLossPath
+          .style('display', runtime.validationRMSE.length ? null : 'none')
+          .datum(xs.slice(0, runtime.validationRMSE.length).map((x, i) => ({ x, y: runtime.validationRMSE[i] })))
+          .attr('d', line);
+        trueLossPath
+          .style('display', state.showTruth && runtime.trueRMSE.length ? null : 'none')
+          .datum(xs.map((x, i) => ({ x, y: runtime.trueRMSE[i] })))
+          .attr('d', line);
+
+        const currentEpoch = config.showCurModel ? clamp(state.curModel, 1, state.epochBlocks) * epochsPerBlock : state.epochs;
+        currentEpochLine
+          .style('display', runtime.trainingRMSE.length ? null : 'none')
+          .attr('x1', sx(Math.min(currentEpoch, state.epochs)))
+          .attr('x2', sx(Math.min(currentEpoch, state.epochs)))
+          .attr('y1', 0)
+          .attr('y2', innerHeight);
+
+        lossLabelX
+          .attr('x', margin.left + innerWidth / 2)
+          .attr('y', height - 14)
+          .text('Epochs');
+        lossLabelY
+          .attr('transform', `translate(18 ${margin.top + innerHeight / 2}) rotate(-90)`)
+          .text('RMSE');
+
+        drawLegend(lossLegend, [
+          { label: 'Training loss', color: constants.colorData, visible: runtime.trainingRMSE.length > 0 },
+          { label: 'Validation loss', color: constants.colorValidation, visible: runtime.validationRMSE.length > 0 },
+          { label: 'True loss', color: constants.colorTruth, visible: runtime.trueRMSE.length > 0 && state.showTruth }
+        ], width, 18, margin.left + 8, 10.5);
+      }
+
+      function renderNetworkDiagram() {
+        const width = Math.max(240, networkFrame.node().clientWidth || 240);
+        const height = 200;
+        networkSvg.attr('viewBox', `0 0 ${width} ${height}`);
+        networkRoot.selectAll('*').remove();
+
+        const layers = [1, Math.round(state.neurons), Math.round(state.neurons), 1];
+        const left = 32;
+        const right = width - 32;
+        const top = 24;
+        const bottom = height - 24;
+        const maxLayer = d3v.max(layers);
+        const hSpace = (right - left) / (layers.length - 1);
+        const vSpace = (bottom - top) / Math.max(maxLayer - 1, 1);
+        const radius = Math.max(5, Math.min(11, vSpace * 0.22));
+        const lineWidth = Math.max(0.5, Math.min(1.1, Math.exp(-(maxLayer - 5) / 10)));
+        const centers = [];
+
+        layers.forEach((size, layerIndex) => {
+          const layerTop = (top + bottom) / 2 - ((size - 1) * vSpace) / 2;
+          const nodes = d3v.range(size).map((nodeIndex) => ({
+            x: left + layerIndex * hSpace,
+            y: layerTop + nodeIndex * vSpace
+          }));
+          centers.push(nodes);
+        });
+
+        for (let i = 0; i < centers.length - 1; i += 1) {
+          centers[i].forEach((source) => {
+            centers[i + 1].forEach((target) => {
+              networkRoot.append('line')
+                .attr('x1', source.x)
+                .attr('y1', source.y)
+                .attr('x2', target.x)
+                .attr('y2', target.y)
+                .attr('stroke', '#0c2340')
+                .attr('stroke-opacity', 0.55)
+                .attr('stroke-width', lineWidth);
+            });
+          });
+        }
+
+        centers.flat().forEach((node) => {
+          networkRoot.append('circle')
+            .attr('cx', node.x)
+            .attr('cy', node.y)
+            .attr('r', radius)
+            .attr('fill', constants.colorNode)
+            .attr('stroke', '#111')
+            .attr('stroke-width', 1.1);
+        });
+      }
+
+      function renderActivationChart() {
+        if (!config.showActivationSelector) return;
+        const width = Math.max(240, activationFrame.node().clientWidth || 240);
+        const height = 180;
+        const margin = { top: 18, right: 14, bottom: 42, left: 42 };
+        const innerWidth = width - margin.left - margin.right;
+        const innerHeight = height - margin.top - margin.bottom;
+        activationSvg.attr('viewBox', `0 0 ${width} ${height}`);
+        activationSvg.selectAll('*').remove();
+        const root = activationSvg.append('g');
+
+        const sx = d3v.scaleLinear().domain([-4, 4]).range([margin.left, margin.left + innerWidth]);
+        const sy = d3v.scaleLinear().domain([-2, 2]).range([margin.top + innerHeight, margin.top]);
+        const axisBottom = d3v.axisBottom(sx).ticks(5);
+        const axisLeft = d3v.axisLeft(sy).ticks(5);
+
+        root.append('g').attr('class', 'grid')
+          .attr('transform', `translate(0,${margin.top + innerHeight})`)
+          .call(d3v.axisBottom(sx).ticks(5).tickSize(-innerHeight).tickFormat(''));
+        root.append('g').attr('class', 'grid')
+          .attr('transform', `translate(${margin.left},0)`)
+          .call(d3v.axisLeft(sy).ticks(5).tickSize(-innerWidth).tickFormat(''));
+        root.append('g').attr('class', 'axis')
+          .attr('transform', `translate(0,${margin.top + innerHeight})`)
+          .call(axisBottom);
+        root.append('g').attr('class', 'axis')
+          .attr('transform', `translate(${margin.left},0)`)
+          .call(axisLeft);
+
+        const xs = d3v.range(121).map(i => -4 + (8 * i) / 120);
+        const ys = xs.map(x => activationValue(state.activation, x));
+        const line = d3v.line().x((d) => sx(d.x)).y((d) => sy(d.y));
+        root.append('path')
+          .datum(xs.map((x, i) => ({ x, y: ys[i] })))
+          .attr('fill', 'none')
+          .attr('stroke', constants.colorPred)
+          .attr('stroke-width', 2.4)
+          .attr('d', line);
+        activationSvg.append('text').attr('class', 'axis-label').attr('x', margin.left + innerWidth / 2).attr('y', height - 10).attr('text-anchor', 'middle').text('a');
+        activationSvg.append('text').attr('class', 'axis-label').attr('transform', `translate(16 ${margin.top + innerHeight / 2}) rotate(-90)`).attr('text-anchor', 'middle').text('z');
+      }
+
+      function computeDataState(localState) {
+        const N = Math.max(2, Math.round(localState.N));
+        const rng = mulberry32(12345 + Math.round(localState.seed));
+        const x = linspace(constants.xmin, constants.xmax, N);
+        const yTruthTrain = x.map((v) => truth(v, localState.freq));
+        const y = yTruthTrain.map((mu) => mu + normalSample(rng) * localState.epsilon);
+        const xDense = constants.xDense.slice();
+        const yDenseTruth = xDense.map((v) => truth(v, localState.freq));
+        const yDense = yDenseTruth.map((mu) => mu + normalSample(rng) * localState.epsilon);
+        const permutation = shuffleWithRng(d3v.range(N), rng);
+        const split = Math.ceil(N * (1 - Math.round(localState.valPct) / 100));
+        const xTrain = permutation.slice(0, split).map(i => x[i]);
+        const yTrain = permutation.slice(0, split).map(i => y[i]);
+        const xVal = permutation.slice(split).map(i => x[i]);
+        const yVal = permutation.slice(split).map(i => y[i]);
+        return {
+          xAll: x,
+          yAll: y,
+          xTrain,
+          yTrain,
+          xVal,
+          yVal,
+          yTruthPred: constants.xPred.map((v) => truth(v, localState.freq)),
+          yDense,
+          yDenseTruth
+        };
+      }
+
+      function createTrainingState(localState, dataState) {
+        const rng = mulberry32(987654 + Math.round(localState.seed));
+        return {
+          rng,
+          batchSize: Math.max(1, Math.min(Math.round(localState.batchSize), dataState.xTrain.length)),
+          activation: localState.activation,
+          xTrain: dataState.xTrain.map(scaleX),
+          yTrain: dataState.yTrain.slice(),
+          net: initNetwork(1, Math.round(localState.neurons), rng, localState.lrMultiplier ?? 1)
+        };
+      }
+
+      function trainOneEpoch(trainState) {
+        const n = trainState.xTrain.length;
+        const order = shuffleWithRng(d3v.range(n), trainState.rng);
+        for (let start = 0; start < n; start += trainState.batchSize) {
+          const batchIdx = order.slice(start, Math.min(start + trainState.batchSize, n));
+          applyBatch(trainState.net, batchIdx.map(i => trainState.xTrain[i]), batchIdx.map(i => trainState.yTrain[i]), trainState.activation);
+        }
+      }
+
+      function initNetwork(inputSize, hiddenSize, rng, lrMultiplier = 1) {
+        return {
+          hiddenSize,
+          lr: (hiddenSize <= 4 ? 0.012 : hiddenSize <= 10 ? 0.009 : 0.006) * lrMultiplier,
+          W1: d3v.range(hiddenSize).map(() => (normalSample(rng) * Math.sqrt(2 / (inputSize + hiddenSize)))),
+          b1: d3v.range(hiddenSize).map(() => 0),
+          W2: d3v.range(hiddenSize).map(() => d3v.range(hiddenSize).map(() => normalSample(rng) * Math.sqrt(2 / (2 * hiddenSize)))),
+          b2: d3v.range(hiddenSize).map(() => 0),
+          W3: d3v.range(hiddenSize).map(() => normalSample(rng) * Math.sqrt(2 / (hiddenSize + 1))),
+          b3: 0
+        };
+      }
+
+      function applyBatch(net, xs, ys, activationName) {
+        const h = net.hiddenSize;
+        const bs = xs.length;
+        const gW1 = new Array(h).fill(0);
+        const gb1 = new Array(h).fill(0);
+        const gW2 = d3v.range(h).map(() => new Array(h).fill(0));
+        const gb2 = new Array(h).fill(0);
+        const gW3 = new Array(h).fill(0);
+        let gb3 = 0;
+
+        for (let b = 0; b < bs; b += 1) {
+          const x = xs[b];
+          const target = ys[b];
+
+          const a1 = new Array(h);
+          const z1 = new Array(h);
+          const a2 = new Array(h);
+          const z2 = new Array(h);
+
+          for (let j = 0; j < h; j += 1) {
+            a1[j] = net.W1[j] * x + net.b1[j];
+            z1[j] = activationValue(activationName, a1[j]);
+          }
+          for (let j = 0; j < h; j += 1) {
+            let sum = net.b2[j];
+            for (let i = 0; i < h; i += 1) sum += net.W2[j][i] * z1[i];
+            a2[j] = sum;
+            z2[j] = activationValue(activationName, a2[j]);
+          }
+          let pred = net.b3;
+          for (let j = 0; j < h; j += 1) pred += net.W3[j] * z2[j];
+
+          const dy = (pred - target) / bs;
+          gb3 += dy;
+          for (let j = 0; j < h; j += 1) gW3[j] += dy * z2[j];
+
+          const dz2 = new Array(h);
+          const da2 = new Array(h);
+          for (let j = 0; j < h; j += 1) {
+            dz2[j] = dy * net.W3[j];
+            da2[j] = dz2[j] * activationDerivative(activationName, a2[j]);
+            gb2[j] += da2[j];
+            for (let i = 0; i < h; i += 1) gW2[j][i] += da2[j] * z1[i];
+          }
+
+          const dz1 = new Array(h).fill(0);
+          for (let i = 0; i < h; i += 1) {
+            for (let j = 0; j < h; j += 1) dz1[i] += da2[j] * net.W2[j][i];
+          }
+          for (let i = 0; i < h; i += 1) {
+            const da1 = dz1[i] * activationDerivative(activationName, a1[i]);
+            gb1[i] += da1;
+            gW1[i] += da1 * x;
+          }
+        }
+
+        const lr = net.lr;
+        for (let j = 0; j < h; j += 1) {
+          net.W1[j] -= lr * gW1[j];
+          net.b1[j] -= lr * gb1[j];
+          net.W3[j] -= lr * gW3[j];
+          net.b2[j] -= lr * gb2[j];
+          for (let i = 0; i < h; i += 1) net.W2[j][i] -= lr * gW2[j][i];
+        }
+        net.b3 -= lr * gb3;
+      }
+
+      function predictSeries(net, xs) {
+        return xs.map((x) => predictSingle(net, scaleX(x), state.activation));
+      }
+
+      function predictSingle(net, x, activationName) {
+        const h = net.hiddenSize;
+        const z1 = new Array(h);
+        for (let j = 0; j < h; j += 1) z1[j] = activationValue(activationName, net.W1[j] * x + net.b1[j]);
+        const z2 = new Array(h);
+        for (let j = 0; j < h; j += 1) {
+          let sum = net.b2[j];
+          for (let i = 0; i < h; i += 1) sum += net.W2[j][i] * z1[i];
+          z2[j] = activationValue(activationName, sum);
+        }
+        let y = net.b3;
+        for (let j = 0; j < h; j += 1) y += net.W3[j] * z2[j];
+        return y;
+      }
+
+      function activationValue(name, x) {
+        if (name === 'identity') return x;
+        if (name === 'relu') return Math.max(0, x);
+        return Math.tanh(x);
+      }
+
+      function activationDerivative(name, x) {
+        if (name === 'identity') return 1;
+        if (name === 'relu') return x > 0 ? 1 : 0;
+        const t = Math.tanh(x);
+        return 1 - t * t;
+      }
+
+      function truth(x, freq) {
+        return Math.sin(x * freq);
+      }
+
+      function drawCrossGroup(group, xs, ys, color, sx, sy, size, strokeWidth) {
+        const selection = group.selectAll('path').data(xs.map((x, i) => ({ x, y: ys[i] })));
+        selection.join(
+          enter => enter.append('path'),
+          update => update,
+          exit => exit.remove()
+        )
+          .attr('d', d => `M${sx(d.x) - size},${sy(d.y) - size}L${sx(d.x) + size},${sy(d.y) + size}M${sx(d.x) - size},${sy(d.y) + size}L${sx(d.x) + size},${sy(d.y) - size}`)
+          .attr('stroke', color)
+          .attr('stroke-width', strokeWidth)
+          .attr('fill', 'none');
+      }
+
+      function drawLegend(layer, items, width, y, startX, fontSize = 11.5) {
+        layer.selectAll('*').remove();
+        const visibleItems = items.filter(item => item.visible);
+        let cursorX = startX;
+        visibleItems.forEach((item) => {
+          const group = layer.append('g').attr('transform', `translate(${cursorX},${y})`);
+          if (item.cross) {
+            group.append('path')
+              .attr('d', 'M0,-4L8,4M0,4L8,-4')
+              .attr('stroke', item.color)
+              .attr('stroke-width', 1.8)
+              .attr('fill', 'none');
+          } else {
+            group.append('line')
+              .attr('x1', 0)
+              .attr('x2', 12)
+              .attr('y1', 0)
+              .attr('y2', 0)
+              .attr('stroke', item.color)
+              .attr('stroke-width', 2.2);
+          }
+          group.append('text').attr('x', 18).attr('y', 4).style('font-size', `${fontSize}px`).text(item.label);
+          cursorX += Math.min(Math.max(item.label.length * 6.25 + 42, 100), Math.max(110, (width - startX) / Math.max(1, visibleItems.length)));
+        });
+      }
+
+      function rmse(actual, predicted) {
+        if (!actual.length) return 0;
+        let sum = 0;
+        for (let i = 0; i < actual.length; i += 1) sum += (actual[i] - predicted[i]) ** 2;
+        return Math.sqrt(sum / actual.length);
+      }
+
+      function scaleX(x) {
+        return (x - constants.xMean) / constants.xStd;
+      }
+
+      function linspace(start, end, n) {
+        if (n === 1) return [start];
+        return d3v.range(n).map(i => start + ((end - start) * i) / (n - 1));
+      }
+
+      function normalSample(rng) {
+        const u = Math.max(rng(), 1e-12);
+        const v = Math.max(rng(), 1e-12);
+        return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+      }
+
+      function shuffleWithRng(values, rng) {
+        const arr = values.slice();
+        for (let i = arr.length - 1; i > 0; i -= 1) {
+          const j = Math.floor(rng() * (i + 1));
+          const tmp = arr[i];
+          arr[i] = arr[j];
+          arr[j] = tmp;
+        }
+        return arr;
+      }
+
+      function mulberry32(seed) {
+        let t = seed >>> 0;
+        return function() {
+          t += 0x6D2B79F5;
+          let r = Math.imul(t ^ (t >>> 15), t | 1);
+          r ^= r + Math.imul(r ^ (r >>> 7), r | 61);
+          return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function formatTrimmed(value, digits) {
+        return (+value).toFixed(digits).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+      }
+
+      function getCSS(name) {
+        return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function clampModelIndex(value) {
+        return clamp(Math.round(value), 1, state.epochBlocks) - 1;
+      }
+
+      new ResizeObserver(() => render()).observe(document.body);
+    })();
+  </script>
+</body>
+</html>
