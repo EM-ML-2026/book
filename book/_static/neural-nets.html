@@ -248,6 +248,7 @@
         activation: 'tanh',
         seed: 0,
         curModel: 200,
+        lrMultiplier: 1,
         showTruth: true
       };
 
@@ -262,7 +263,7 @@
           controls: ['curModel'],
           showCurModel: true,
           showActivationSelector: false,
-          defaults: { N: 40, valPct: 60, epochs: 12000, neurons: 20, seed: 4, batchSize: 2, activation: 'tanh' }
+          defaults: { N: 10, valPct: 60, epochs: 20000, neurons: 20, seed: 4, batchSize: 2, activation: 'tanh', lrMultiplier: 1.35 }
         },
         playground: {
           controls: ['freq', 'neurons', 'N', 'curModel', 'valPct'],
@@ -847,7 +848,7 @@
           activation: localState.activation,
           xTrain: dataState.xTrain.map(scaleX),
           yTrain: dataState.yTrain.slice(),
-          net: initNetwork(1, Math.round(localState.neurons), rng)
+          net: initNetwork(1, Math.round(localState.neurons), rng, localState.lrMultiplier ?? 1)
         };
       }
 
@@ -860,10 +861,10 @@
         }
       }
 
-      function initNetwork(inputSize, hiddenSize, rng) {
+      function initNetwork(inputSize, hiddenSize, rng, lrMultiplier = 1) {
         return {
           hiddenSize,
-          lr: hiddenSize <= 4 ? 0.012 : hiddenSize <= 10 ? 0.009 : 0.006,
+          lr: (hiddenSize <= 4 ? 0.012 : hiddenSize <= 10 ? 0.009 : 0.006) * lrMultiplier,
           W1: d3v.range(hiddenSize).map(() => (normalSample(rng) * Math.sqrt(2 / (inputSize + hiddenSize)))),
           b1: d3v.range(hiddenSize).map(() => 0),
           W2: d3v.range(hiddenSize).map(() => d3v.range(hiddenSize).map(() => normalSample(rng) * Math.sqrt(2 / (2 * hiddenSize)))),
