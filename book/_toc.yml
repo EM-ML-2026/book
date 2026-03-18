@@ -15,6 +15,7 @@ parts:
     chapters:
     - file: frequentist/knn.ipynb
     - file: frequentist/decision_theory.ipynb
+    - file: frequentist/linear_models.ipynb
   - caption: Bayesian Regression
     chapters:
     - file: bayesian/linear_models.md
