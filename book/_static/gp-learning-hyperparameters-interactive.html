@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive GP Hyperparameters</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <style>
+    :root {
+      --c-mean: #0076c2;
+      --c-fill: #0076c2;
+      --c-truth: #111111;
+      --c-grid: #ffffff;
+      --c-axis: #7f8794;
+      --c-border: #dde3ea;
+      --c-muted: #5f6b7a;
+      --c-surface: #ffffff;
+      --c-panel: #eaeaf2;
+      --c-observation: #111111;
+      --c-sample: #6f1d77;
+      --c-optimum: #a50034;
+      --c-matrix-low: #eef2f6;
+      --c-matrix-high: #0076c2;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #1b1f24;
+      background: var(--c-surface);
+    }
+
+    .widget-shell {
+      width: 100%;
+      max-width: 100%;
+      padding: 8px;
+      margin: 0 auto;
+      background: var(--c-surface);
+    }
+
+    .widget-card {
+      width: 100%;
+      border: 1px solid var(--c-border);
+      border-radius: 12px;
+      background: var(--c-surface);
+      box-shadow: 0 1px 3px rgba(12, 35, 64, 0.06);
+      overflow: hidden;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 128px;
+      gap: 12px;
+      padding: 12px;
+      border-bottom: 1px solid #edf1f5;
+      background: #f7f9fb;
+      align-items: center;
+    }
+
+    .sliders {
+      display: grid;
+      gap: 10px;
+      align-content: stretch;
+    }
+
+    .slider-block {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .slider-symbol {
+      color: #243140;
+      font-weight: 600;
+      white-space: nowrap;
+      min-width: 28px;
+      text-align: left;
+    }
+
+    .slider-value {
+      color: var(--c-muted);
+      font-variant-numeric: tabular-nums;
+      font-size: 0.78rem;
+      white-space: nowrap;
+      min-width: 42px;
+      text-align: right;
+    }
+
+    .slider-wrap {
+      position: relative;
+      height: 24px;
+      display: flex;
+      align-items: center;
+    }
+
+    .slider-track {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 6px;
+      transform: translateY(-50%);
+      border-radius: 999px;
+      background: linear-gradient(90deg, #dce3eb 0%, #cdd7e4 100%);
+      pointer-events: none;
+    }
+
+    .optimum-marker {
+      position: absolute;
+      top: 2px;
+      bottom: 2px;
+      width: 2px;
+      background: var(--c-optimum);
+      border-radius: 999px;
+      pointer-events: none;
+      box-shadow: 0 0 0 1px rgba(165, 0, 52, 0.08);
+    }
+
+    .optimum-label {
+      position: absolute;
+      top: 100%;
+      transform: translate(-50%, 2px);
+      color: var(--c-optimum);
+      font-size: 0.69rem;
+      white-space: nowrap;
+      pointer-events: none;
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      position: relative;
+      width: 100%;
+      margin: 0;
+      background: transparent;
+      -webkit-appearance: none;
+      appearance: none;
+      z-index: 1;
+    }
+
+    input[type="range"]:focus { outline: none; }
+
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 6px;
+      background: transparent;
+      border-radius: 999px;
+    }
+
+    input[type="range"]::-moz-range-track {
+      height: 6px;
+      background: transparent;
+      border: none;
+      border-radius: 999px;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      margin-top: -5px;
+      border-radius: 50%;
+      border: 2px solid #ffffff;
+      background: var(--c-mean);
+      box-shadow: 0 1px 4px rgba(12, 35, 64, 0.25);
+      cursor: pointer;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border: 2px solid #ffffff;
+      border-radius: 50%;
+      background: var(--c-mean);
+      box-shadow: 0 1px 4px rgba(12, 35, 64, 0.25);
+      cursor: pointer;
+    }
+
+    .matrix-card {
+      border: 1px solid var(--c-border);
+      border-radius: 10px;
+      background: #ffffff;
+      min-height: 104px;
+      height: 104px;
+      overflow: hidden;
+    }
+
+    .matrix-frame {
+      padding: 6px;
+      width: 100%;
+      height: 100%;
+    }
+
+    .matrix-frame svg,
+    .chart-frame svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .chart-panel {
+      padding: 10px;
+      background: #ffffff;
+    }
+
+    .chart-frame {
+      width: 100%;
+      border: 1px solid var(--c-border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--c-panel);
+    }
+
+    .axis path,
+    .axis line {
+      stroke: var(--c-axis);
+    }
+
+    .axis text,
+    .legend text,
+    .axis-label,
+    .matrix-label,
+    .matrix-caption {
+      font-family: inherit;
+    }
+
+    .axis text,
+    .axis-label,
+    .matrix-label,
+    .matrix-caption {
+      fill: #44505d;
+      font-size: 12px;
+    }
+
+    .grid line {
+      stroke: var(--c-grid);
+      stroke-opacity: 0.96;
+    }
+
+    .grid path { display: none; }
+
+    .legend text {
+      font-size: 12px;
+      fill: #243140;
+    }
+
+    .legend .legend-bg {
+      fill: rgba(255,255,255,0.82);
+      stroke: rgba(221,227,234,0.9);
+      rx: 8px;
+      ry: 8px;
+    }
+
+    @media (max-width: 700px) {
+      .controls {
+        grid-template-columns: 1fr;
+      }
+
+      .matrix-card {
+        min-height: 160px;
+        height: 160px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="widget-shell">
+    <div class="widget-card">
+      <div class="controls">
+        <div class="sliders">
+          <div class="slider-block" data-key="sigma">
+            <div class="slider-symbol"><i>σ</i><sub>f</sub></div>
+            <div class="slider-wrap">
+              <div class="slider-track"></div>
+              <div class="optimum-marker" id="sigma-opt-marker"></div>
+              <div class="optimum-label" id="sigma-opt-label"></div>
+              <input id="sigma-slider" type="range" />
+            </div>
+            <div class="slider-value" id="sigma-value"></div>
+          </div>
+          <div class="slider-block" data-key="length">
+            <div class="slider-symbol"><i>ℓ</i></div>
+            <div class="slider-wrap">
+              <div class="slider-track"></div>
+              <div class="optimum-marker" id="length-opt-marker"></div>
+              <div class="optimum-label" id="length-opt-label"></div>
+              <input id="length-slider" type="range" />
+            </div>
+            <div class="slider-value" id="length-value"></div>
+          </div>
+          <div class="slider-block" data-key="beta">
+            <div class="slider-symbol"><i>β</i></div>
+            <div class="slider-wrap">
+              <div class="slider-track"></div>
+              <div class="optimum-marker" id="beta-opt-marker"></div>
+              <div class="optimum-label" id="beta-opt-label"></div>
+              <input id="beta-slider" type="range" />
+            </div>
+            <div class="slider-value" id="beta-value"></div>
+          </div>
+        </div>
+        <div class="matrix-card">
+          <div class="matrix-frame" id="matrix-frame"></div>
+        </div>
+      </div>
+      <div class="chart-panel">
+        <div class="chart-frame" id="chart-frame"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const d3v = window.d3;
+      if (!d3v) {
+        document.getElementById('chart-frame').innerHTML = '<p style="color:#b00020;padding:12px">D3 failed to load from CDN.</p>';
+        return;
+      }
+
+      const TWO_PI = Math.PI * 2;
+      const GRID_COUNT = 150;
+      const MATRIX_COUNT = 28;
+      const SAMPLE_INTERVAL_MS = 900;
+      const MAX_VISIBLE_SAMPLES = 10;
+      const TRANSITION_MS = 260;
+      const JITTER = 1e-8;
+      const SAMPLE_COLORS = ['#0076C2', '#EC6842', '#A50034', '#009B77', '#FFB81C', '#E03C31', '#6CC24A', '#EF60A3', '#0C2340', '#00B8C8'];
+      const yExtent = [-1.55, 1.55];
+      const xGrid = d3v.range(GRID_COUNT).map((i) => (i / (GRID_COUNT - 1)) * TWO_PI);
+
+      const OPTIMUM = {
+        sigma: 0.3766,
+        length: 1.1972,
+        beta: 167.1
+      };
+
+      const sliderConfig = {
+        sigma: { id: 'sigma-slider', valueId: 'sigma-value', min: Math.log(0.15), max: Math.log(3.0), step: 0.001, optimum: OPTIMUM.sigma },
+        length: { id: 'length-slider', valueId: 'length-value', min: Math.log(0.18), max: Math.log(3.2), step: 0.001, optimum: OPTIMUM.length },
+        beta: { id: 'beta-slider', valueId: 'beta-value', min: Math.log(5.0), max: Math.log(260.0), step: 0.001, optimum: OPTIMUM.beta }
+      };
+
+      const observations = [
+        { x: 2.0, y: Math.sin(2.0) + 0.05 },
+        { x: 3.0, y: Math.sin(3.0) - 0.07 },
+        { x: 4.0, y: Math.sin(4.0) + 0.04 },
+        { x: 5.0, y: Math.sin(5.0) - 0.05 }
+      ];
+
+      const state = {
+        params: {},
+        model: null,
+        samples: [],
+        sampleCounter: 0
+      };
+
+      function mulberry32(seed) {
+        let a = seed >>> 0;
+        return function random() {
+          a = (a + 0x6D2B79F5) >>> 0;
+          let t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      const seededRandom = mulberry32(4012026);
+
+      function randomNormal(rng = Math.random) {
+        let u = 0;
+        let v = 0;
+        while (u === 0) u = rng();
+        while (v === 0) v = rng();
+        return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+      }
+
+      function groundTruth(x) {
+        return Math.sin(x);
+      }
+
+      function kernel(a, b, sigma, length) {
+        const diff = a - b;
+        return sigma * sigma * Math.exp(-0.5 * (diff * diff) / (length * length));
+      }
+
+      function createMatrix(rows, cols, fill = 0) {
+        return Array.from({ length: rows }, () => Array(cols).fill(fill));
+      }
+
+      function cloneMatrix(matrix) {
+        return matrix.map((row) => row.slice());
+      }
+
+      function cholesky(matrix) {
+        const n = matrix.length;
+        const L = createMatrix(n, n, 0);
+        for (let i = 0; i < n; i += 1) {
+          for (let j = 0; j <= i; j += 1) {
+            let sum = matrix[i][j];
+            for (let k = 0; k < j; k += 1) sum -= L[i][k] * L[j][k];
+            if (i === j) {
+              if (sum <= 0) sum = JITTER;
+              L[i][j] = Math.sqrt(sum);
+            } else {
+              L[i][j] = sum / L[j][j];
+            }
+          }
+        }
+        return L;
+      }
+
+      function solveLowerTriangular(L, b) {
+        const n = L.length;
+        const y = Array(n).fill(0);
+        for (let i = 0; i < n; i += 1) {
+          let sum = b[i];
+          for (let j = 0; j < i; j += 1) sum -= L[i][j] * y[j];
+          y[i] = sum / L[i][i];
+        }
+        return y;
+      }
+
+      function solveUpperTriangular(L, b) {
+        const n = L.length;
+        const x = Array(n).fill(0);
+        for (let i = n - 1; i >= 0; i -= 1) {
+          let sum = b[i];
+          for (let j = i + 1; j < n; j += 1) sum -= L[j][i] * x[j];
+          x[i] = sum / L[i][i];
+        }
+        return x;
+      }
+
+      function solveSymmetricFromCholesky(L, b) {
+        return solveUpperTriangular(L, solveLowerTriangular(L, b));
+      }
+
+      function matVec(matrix, vector) {
+        return matrix.map((row) => row.reduce((acc, value, idx) => acc + value * vector[idx], 0));
+      }
+
+      function computePosterior(params) {
+        const sigma = params.sigma;
+        const length = params.length;
+        const beta = params.beta;
+        const noiseVariance = 1 / beta;
+        const xObs = observations.map((d) => d.x);
+        const yObs = observations.map((d) => d.y);
+        const nObs = xObs.length;
+        const nGrid = xGrid.length;
+
+        const K = createMatrix(nObs, nObs, 0);
+        for (let i = 0; i < nObs; i += 1) {
+          for (let j = 0; j < nObs; j += 1) {
+            K[i][j] = kernel(xObs[i], xObs[j], sigma, length);
+          }
+          K[i][i] += noiseVariance + JITTER;
+        }
+
+        const L = cholesky(K);
+        const alpha = solveSymmetricFromCholesky(L, yObs);
+
+        const mean = [];
+        const latentVariance = [];
+        const predictiveVariance = [];
+        const posteriorCov = createMatrix(nGrid, nGrid, 0);
+
+        const kStarRows = [];
+        for (let i = 0; i < nGrid; i += 1) {
+          const row = xObs.map((x) => kernel(xGrid[i], x, sigma, length));
+          kStarRows.push(row);
+          mean.push(row.reduce((acc, value, idx) => acc + value * alpha[idx], 0));
+        }
+
+        for (let i = 0; i < nGrid; i += 1) {
+          const v = solveLowerTriangular(L, kStarRows[i]);
+          const base = kernel(xGrid[i], xGrid[i], sigma, length);
+          const latVar = Math.max(base - v.reduce((acc, value) => acc + value * value, 0), 0);
+          latentVariance.push(latVar);
+          predictiveVariance.push(latVar + noiseVariance);
+        }
+
+        const solvedColumns = kStarRows.map((row) => solveSymmetricFromCholesky(L, row));
+        for (let i = 0; i < nGrid; i += 1) {
+          for (let j = 0; j <= i; j += 1) {
+            let cross = 0;
+            for (let m = 0; m < nObs; m += 1) cross += kStarRows[i][m] * solvedColumns[j][m];
+            const value = kernel(xGrid[i], xGrid[j], sigma, length) - cross;
+            posteriorCov[i][j] = value;
+            posteriorCov[j][i] = value;
+          }
+        }
+
+        const matrixX = d3v.range(MATRIX_COUNT).map((i) => (i / (MATRIX_COUNT - 1)) * TWO_PI);
+        const matrixCov = matrixX.map((x1) => matrixX.map((x2) => kernel(x1, x2, sigma, length)));
+
+        return {
+          sigma,
+          length,
+          beta,
+          noiseVariance,
+          mean,
+          latentVariance,
+          predictiveVariance,
+          covariance: posteriorCov,
+          matrixCov,
+          band: xGrid.map((x, i) => ({
+            x,
+            mean: mean[i],
+            lower: mean[i] - 1.96 * Math.sqrt(Math.max(predictiveVariance[i], 0)),
+            upper: mean[i] + 1.96 * Math.sqrt(Math.max(predictiveVariance[i], 0))
+          })),
+          line: xGrid.map((x, i) => ({ x, y: mean[i] }))
+        };
+      }
+
+      function sampleFromPosterior(model) {
+        const indices = d3v.range(model.mean.length);
+        const cov = cloneMatrix(model.covariance);
+        for (let i = 0; i < cov.length; i += 1) cov[i][i] += JITTER;
+        const L = cholesky(cov);
+        const z = indices.map(() => randomNormal(seededRandom));
+        const sample = indices.map((i) => {
+          let value = model.mean[i];
+          for (let j = 0; j <= i; j += 1) value += L[i][j] * z[j];
+          return { x: xGrid[i], y: value };
+        });
+        state.samples.push({
+          id: state.sampleCounter += 1,
+          color: SAMPLE_COLORS[(state.sampleCounter - 1) % SAMPLE_COLORS.length],
+          data: sample
+        });
+        if (state.samples.length > MAX_VISIBLE_SAMPLES) state.samples.shift();
+      }
+
+      function formatValue(value) {
+        if (value >= 100) return value.toFixed(1);
+        if (value >= 10) return value.toFixed(2);
+        return value.toFixed(3);
+      }
+
+      Object.entries(sliderConfig).forEach(([key, config]) => {
+        const slider = document.getElementById(config.id);
+        slider.min = config.min;
+        slider.max = config.max;
+        slider.step = config.step;
+        const randomLog = config.min + (config.max - config.min) * seededRandom();
+        state.params[key] = Math.exp(randomLog);
+        slider.value = randomLog;
+
+        const pct = ((Math.log(config.optimum) - config.min) / (config.max - config.min)) * 100;
+        const marker = document.getElementById(`${key}-opt-marker`);
+        const label = document.getElementById(`${key}-opt-label`);
+        marker.style.left = `calc(${pct}% - 1px)`;
+        label.style.left = `${pct}%`;
+        label.textContent = `opt ${formatValue(config.optimum)}`;
+      });
+
+      const chartFrame = d3v.select('#chart-frame');
+      const svg = chartFrame.append('svg');
+      const defs = svg.append('defs');
+      defs.append('clipPath').attr('id', 'plot-clip').append('rect');
+      const rootLayer = svg.append('g');
+      const gridLayer = rootLayer.append('g').attr('class', 'grid');
+      const sampleLayer = rootLayer.append('g').attr('clip-path', 'url(#plot-clip)');
+      const bandLayer = rootLayer.append('g').attr('clip-path', 'url(#plot-clip)');
+      const meanLayer = rootLayer.append('g').attr('clip-path', 'url(#plot-clip)');
+      const truthLayer = rootLayer.append('g').attr('clip-path', 'url(#plot-clip)');
+      const obsLayer = rootLayer.append('g').attr('clip-path', 'url(#plot-clip)');
+      const axisLayer = rootLayer.append('g');
+      const legendLayer = rootLayer.append('g').attr('class', 'legend');
+
+      const matrixFrame = d3v.select('#matrix-frame');
+      const matrixSvg = matrixFrame.append('svg');
+      const matrixRoot = matrixSvg.append('g');
+      const matrixHeat = matrixRoot.append('g');
+      const matrixAxis = matrixRoot.append('g');
+
+      const bandPath = bandLayer.append('path')
+        .attr('fill', 'var(--c-fill)')
+        .attr('fill-opacity', 0.15)
+        .attr('stroke', 'none');
+
+      const meanPath = meanLayer.append('path')
+        .attr('fill', 'none')
+        .attr('stroke', 'var(--c-mean)')
+        .attr('stroke-width', 2.5)
+        .attr('stroke-linejoin', 'round')
+        .attr('stroke-linecap', 'round');
+
+      const truthPath = truthLayer.append('path')
+        .attr('fill', 'none')
+        .attr('stroke', 'var(--c-truth)')
+        .attr('stroke-width', 1.5)
+        .attr('stroke-dasharray', '6 5')
+        .attr('stroke-linecap', 'round');
+
+      const axisBottom = axisLayer.append('g').attr('class', 'axis');
+      const axisLeft = axisLayer.append('g').attr('class', 'axis');
+      const xLabel = axisLayer.append('text').attr('class', 'axis-label').attr('text-anchor', 'middle').text('x');
+      const yLabel = axisLayer.append('text').attr('class', 'axis-label').attr('text-anchor', 'middle').text('y');
+
+      const xScale = d3v.scaleLinear().domain([0, TWO_PI]);
+      const yScale = d3v.scaleLinear().domain(yExtent);
+      const lineGenerator = d3v.line().x((d) => xScale(d.x)).y((d) => yScale(d.y)).curve(d3v.curveBasis);
+      const areaGenerator = d3v.area().x((d) => xScale(d.x)).y0((d) => yScale(d.lower)).y1((d) => yScale(d.upper)).curve(d3v.curveBasis);
+      const matrixColor = d3v.scaleLinear().range(['#f3f6fa', '#0076c2']);
+      const matrixAxisScale = d3v.scaleLinear().domain([0, TWO_PI]);
+
+      let layout = null;
+      let sampleTimer = null;
+
+      function updateSliderText() {
+        Object.entries(sliderConfig).forEach(([key, config]) => {
+          document.getElementById(config.valueId).textContent = formatValue(state.params[key]);
+        });
+      }
+
+      function resize() {
+        const width = Math.max(chartFrame.node().clientWidth, 320);
+        const height = Math.max(420, Math.round(width * 0.58));
+        svg.attr('viewBox', `0 0 ${width} ${height}`);
+        layout = {
+          width,
+          height,
+          margin: {
+            top: 18,
+            right: 22,
+            bottom: 48,
+            left: 52
+          }
+        };
+        layout.innerWidth = layout.width - layout.margin.left - layout.margin.right;
+        layout.innerHeight = layout.height - layout.margin.top - layout.margin.bottom;
+
+        rootLayer.attr('transform', `translate(${layout.margin.left},${layout.margin.top})`);
+        xScale.range([0, layout.innerWidth]);
+        yScale.range([layout.innerHeight, 0]);
+
+        defs.select('rect')
+          .attr('x', 0)
+          .attr('y', 0)
+          .attr('width', layout.innerWidth)
+          .attr('height', layout.innerHeight);
+
+        axisBottom.attr('transform', `translate(0,${layout.innerHeight})`);
+        xLabel.attr('x', layout.innerWidth / 2).attr('y', layout.innerHeight + 38);
+        yLabel.attr('transform', `translate(${-38},${layout.innerHeight / 2}) rotate(-90)`);
+
+        renderGrid();
+        renderModel();
+        renderLegend();
+
+        const matrixWidth = Math.max(matrixFrame.node().clientWidth, 110);
+        const matrixHeight = Math.max(matrixFrame.node().clientHeight, 90);
+        matrixSvg.attr('viewBox', `0 0 ${matrixWidth} ${matrixHeight}`);
+        renderMatrix();
+      }
+
+      function renderGrid() {
+        if (!layout) return;
+        const xTicks = [0, 2, 4, 6];
+        const yTicks = [-1, 0, 1];
+
+        const xGridLines = gridLayer.selectAll('.x-grid').data(xTicks);
+        xGridLines.join('line')
+          .attr('class', 'x-grid')
+          .attr('x1', (d) => xScale(d))
+          .attr('x2', (d) => xScale(d))
+          .attr('y1', 0)
+          .attr('y2', layout.innerHeight)
+          .attr('stroke-width', 1);
+
+        const yGridLines = gridLayer.selectAll('.y-grid').data(yTicks);
+        yGridLines.join('line')
+          .attr('class', 'y-grid')
+          .attr('x1', 0)
+          .attr('x2', layout.innerWidth)
+          .attr('y1', (d) => yScale(d))
+          .attr('y2', (d) => yScale(d))
+          .attr('stroke-width', 1);
+
+        axisBottom.call(d3v.axisBottom(xScale).tickValues(xTicks).tickFormat(d3v.format('.0f')));
+        axisLeft.call(d3v.axisLeft(yScale).tickValues(yTicks));
+      }
+
+      function renderObservations() {
+        const circles = obsLayer.selectAll('circle').data(observations);
+        circles.join('circle')
+          .attr('cx', (d) => xScale(d.x))
+          .attr('cy', (d) => yScale(d.y))
+          .attr('r', 4.6)
+          .attr('fill', 'var(--c-observation)');
+      }
+
+      function renderSamples() {
+        const samplePaths = sampleLayer.selectAll('path').data(state.samples, (d) => d.id);
+        samplePaths.join(
+          (enter) => enter.append('path')
+            .attr('fill', 'none')
+            .attr('stroke-width', 1.25)
+            .attr('stroke-linejoin', 'round')
+            .attr('stroke-linecap', 'round')
+            .attr('stroke', (d) => d.color)
+            .attr('opacity', 0)
+            .attr('d', (d) => lineGenerator(d.data))
+            .call((enterSel) => enterSel.transition().duration(300).attr('opacity', 1)),
+          (update) => update,
+          (exit) => exit.transition().duration(400).attr('opacity', 0).remove()
+        )
+        .transition()
+        .duration(250)
+        .attr('d', (d) => lineGenerator(d.data))
+        .attr('opacity', (_, i, nodes) => {
+          const count = nodes.length;
+          if (count <= 1) return 1;
+          return 0.08 + 0.72 * ((i + 1) / count);
+        });
+      }
+
+      function renderLegend() {
+        if (!layout) return;
+        const items = [
+          { label: 'Ground truth', type: 'line-dash', color: '#111111' },
+          { label: '95% conf. interval', type: 'band', color: '#0076c2' },
+          { label: 'Mean', type: 'line', color: '#0076c2' },
+          { label: 'Observations', type: 'point', color: '#111111' },
+          { label: 'y(x) samples', type: 'sample', color: '#6f1d77' }
+        ];
+
+        const rowHeight = 17;
+        const paddingTop = 10;
+        const paddingBottom = 10;
+        const width = 172;
+        const height = items.length * rowHeight + paddingTop + paddingBottom;
+        legendLayer.attr('transform', `translate(12,${layout.innerHeight - height - 10})`);
+
+        const bg = legendLayer.selectAll('rect').data([null]);
+        bg.join('rect').attr('class', 'legend-bg').attr('width', width).attr('height', height);
+
+        const rows = legendLayer.selectAll('.legend-row').data(items).join('g').attr('class', 'legend-row')
+          .attr('transform', (_, i) => `translate(10,${paddingTop + 2 + i * rowHeight})`);
+
+        rows.each(function(d) {
+          const row = d3v.select(this);
+          row.selectAll('*').remove();
+          if (d.type === 'band') {
+            row.append('rect').attr('x', 0).attr('y', -8).attr('width', 18).attr('height', 10).attr('fill', d.color).attr('fill-opacity', 0.15).attr('stroke', 'none');
+          } else if (d.type === 'point') {
+            row.append('circle').attr('cx', 9).attr('cy', -3).attr('r', 3.5).attr('fill', d.color);
+          } else {
+            row.append('line').attr('x1', 0).attr('x2', 18).attr('y1', -3).attr('y2', -3)
+              .attr('stroke', d.color)
+              .attr('stroke-width', d.type === 'line' ? 2.5 : 1.5)
+              .attr('stroke-dasharray', d.type === 'line-dash' ? '6 5' : null)
+              .attr('stroke-opacity', d.type === 'sample' ? 0.75 : 1);
+          }
+          row.append('text').attr('x', 26).attr('y', 1.5).text(d.label);
+        });
+      }
+
+      function renderMatrix() {
+        if (!state.model) return;
+        const width = Math.max(matrixFrame.node().clientWidth, 110);
+        const height = Math.max(matrixFrame.node().clientHeight, 90);
+        const margin = { top: 6, right: 10, bottom: 18, left: 18 };
+        const innerSize = Math.min(width - margin.left - margin.right, height - margin.top - margin.bottom - 12);
+        const offsetX = (width - margin.left - margin.right - innerSize) / 2;
+        const offsetY = 2;
+
+        matrixRoot.attr('transform', `translate(${margin.left + offsetX},${margin.top + offsetY})`);
+        const cellSize = innerSize / MATRIX_COUNT;
+        const flat = state.model.matrixCov.flat();
+        const maxValue = d3v.max(flat) || 1;
+        const minValue = d3v.min(flat) || 0;
+        matrixColor.domain([maxValue, minValue]);
+
+        const cells = [];
+        state.model.matrixCov.forEach((row, i) => {
+          row.forEach((value, j) => {
+            cells.push({ i, j, value });
+          });
+        });
+
+        matrixHeat.selectAll('rect.cell')
+          .data(cells)
+          .join('rect')
+          .attr('class', 'cell')
+          .transition()
+          .duration(TRANSITION_MS)
+          .attr('x', (d) => d.j * cellSize)
+          .attr('y', (d) => d.i * cellSize)
+          .attr('width', cellSize + 0.4)
+          .attr('height', cellSize + 0.4)
+          .attr('fill', (d) => matrixColor(d.value));
+
+        matrixHeat.selectAll('.matrix-outline').data([null]).join('rect')
+          .attr('class', 'matrix-outline')
+          .attr('x', 0)
+          .attr('y', 0)
+          .attr('width', innerSize)
+          .attr('height', innerSize)
+          .attr('fill', 'none')
+          .attr('stroke', '#cfd7e3');
+
+        matrixAxis.selectAll('*').remove();
+        const axisScale = matrixAxisScale.range([0, innerSize]);
+        const bottom = matrixAxis.append('g').attr('class', 'axis').attr('transform', `translate(0,${innerSize})`).call(d3v.axisBottom(axisScale).tickValues([0, Math.PI, TWO_PI]).tickFormat(() => ''));
+        const left = matrixAxis.append('g').attr('class', 'axis').call(d3v.axisLeft(axisScale).tickValues([0, Math.PI, TWO_PI]).tickFormat(() => ''));
+        bottom.selectAll('line').attr('stroke', '#cfd7e3');
+        left.selectAll('line').attr('stroke', '#cfd7e3');
+
+        matrixAxis.append('text').attr('class', 'matrix-label').attr('x', innerSize / 2).attr('y', innerSize + 18).attr('text-anchor', 'middle').text('x');
+        matrixAxis.append('text').attr('class', 'matrix-label').attr('transform', `translate(${-16},${innerSize / 2}) rotate(-90)`).attr('text-anchor', 'middle').text("x'");
+      }
+
+      function renderModel() {
+        if (!layout || !state.model) return;
+        bandPath.transition().duration(TRANSITION_MS).attr('d', areaGenerator(state.model.band));
+        meanPath.transition().duration(TRANSITION_MS).attr('d', lineGenerator(state.model.line));
+        truthPath.attr('d', lineGenerator(xGrid.map((x) => ({ x, y: groundTruth(x) }))));
+        renderObservations();
+        renderSamples();
+        renderMatrix();
+      }
+
+      function refreshModel(resetSamples = false) {
+        state.model = computePosterior(state.params);
+        if (resetSamples) state.samples = [];
+        renderModel();
+      }
+
+      function bindSliders() {
+        Object.entries(sliderConfig).forEach(([key, config]) => {
+          const slider = document.getElementById(config.id);
+          slider.addEventListener('input', (event) => {
+            state.params[key] = Math.exp(Number(event.target.value));
+            updateSliderText();
+            refreshModel(true);
+            sampleFromPosterior(state.model);
+            renderSamples();
+          });
+        });
+      }
+
+      function startSampleLoop() {
+        if (sampleTimer) clearInterval(sampleTimer);
+        sampleTimer = setInterval(() => {
+          if (!state.model) return;
+          sampleFromPosterior(state.model);
+          renderSamples();
+        }, SAMPLE_INTERVAL_MS);
+      }
+
+      bindSliders();
+      updateSliderText();
+      refreshModel(true);
+      resize();
+      startSampleLoop();
+      new ResizeObserver(() => resize()).observe(document.body);
+    })();
+  </script>
+</body>
+</html>

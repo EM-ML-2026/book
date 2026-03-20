@@ -85,3 +85,14 @@ Prior and posterior distributions, with $\sigma_f=0.4$, $\ell=1.2$, $\beta=167.1
 ````
 
 `````
+
+## Interactive hyperparameter explorer
+
+The widget below fixes four observations at $x=2$, $x=3$, $x=4$, and $x=5$ and lets you vary the squared exponential hyperparameters. The red marks on the sliders indicate the empirical-Bayes optimum values from the optimized figure above.
+
+<iframe
+  src="../_static/gp-learning-hyperparameters-interactive.html"
+  title="Interactive Gaussian process hyperparameter explorer"
+  style="width: 100%; height: 840px; border: 0; overflow: hidden;"
+  loading="lazy"
+></iframe>
