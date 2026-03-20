@@ -277,10 +277,6 @@
       const statusText = infoLayer.append('text')
         .attr('class', 'status-text');
 
-      const noteText = infoLayer.append('text')
-        .attr('class', 'annotation')
-        .text('Samples are draws from y(x); the shaded region is the 95% interval for t.');
-
       const axisBottom = axesLayer.append('g').attr('class', 'axis');
       const axisLeft = axesLayer.append('g').attr('class', 'axis');
       const xLabel = axesLayer.append('text').attr('class', 'axis-label').attr('text-anchor', 'middle').text('x');
@@ -580,7 +576,7 @@
 
         const legendWidth = 164;
         const legendHeight = 92;
-        const legendX = layout.margin.left + Math.max(14, layout.innerWidth * 0.37);
+        const legendX = layout.margin.left + layout.innerWidth - legendWidth - 12;
         const legendY = layout.margin.top + layout.innerHeight - legendHeight - 12;
 
         const box = legendLayer.selectAll('rect.legend-box').data([null]);
@@ -669,9 +665,6 @@
           .attr('x', layout.margin.left)
           .attr('y', layout.margin.top - 12)
           .text(`Observations: ${state.observations.length}`);
-        noteText
-          .attr('x', layout.margin.left)
-          .attr('y', layout.height - 12);
       }
 
       function renderAxes() {
