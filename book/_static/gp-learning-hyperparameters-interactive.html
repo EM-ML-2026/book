@@ -51,37 +51,33 @@
 
     .controls {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(170px, 23%);
+      grid-template-columns: minmax(0, 1fr) 165px;
       gap: 14px;
       padding: 14px;
       border-bottom: 1px solid #edf1f5;
       background: #f7f9fb;
-      align-items: stretch;
+      align-items: center;
     }
 
     .sliders {
       display: grid;
-      gap: 12px;
-      align-content: center;
+      gap: 10px;
+      align-content: stretch;
     }
 
     .slider-block {
       display: grid;
-      gap: 5px;
-    }
-
-    .slider-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
       gap: 10px;
-      font-size: 0.95rem;
     }
 
     .slider-symbol {
       color: #243140;
       font-weight: 600;
       white-space: nowrap;
+      min-width: 34px;
+      text-align: left;
     }
 
     .slider-value {
@@ -89,11 +85,13 @@
       font-variant-numeric: tabular-nums;
       font-size: 0.84rem;
       white-space: nowrap;
+      min-width: 52px;
+      text-align: right;
     }
 
     .slider-wrap {
       position: relative;
-      height: 28px;
+      height: 24px;
       display: flex;
       align-items: center;
     }
@@ -124,9 +122,9 @@
     .optimum-label {
       position: absolute;
       top: 100%;
-      transform: translate(-50%, 3px);
+      transform: translate(-50%, 2px);
       color: var(--c-optimum);
-      font-size: 0.72rem;
+      font-size: 0.69rem;
       white-space: nowrap;
       pointer-events: none;
       font-variant-numeric: tabular-nums;
@@ -186,18 +184,19 @@
       background: #ffffff;
       display: grid;
       grid-template-rows: auto 1fr;
-      min-height: 180px;
+      min-height: 122px;
+      height: 122px;
       overflow: hidden;
     }
 
     .matrix-title {
-      padding: 9px 10px 0;
-      font-size: 0.83rem;
+      padding: 8px 10px 0;
+      font-size: 0.76rem;
       color: var(--c-muted);
     }
 
     .matrix-frame {
-      padding: 8px 10px 10px;
+      padding: 4px 8px 8px;
       min-height: 0;
     }
 
@@ -254,7 +253,7 @@
       fill: #243140;
     }
 
-    .legend rect {
+    .legend .legend-bg {
       fill: rgba(255,255,255,0.82);
       stroke: rgba(221,227,234,0.9);
       rx: 8px;
@@ -278,7 +277,8 @@
       }
 
       .matrix-card {
-        min-height: 220px;
+        min-height: 180px;
+        height: 180px;
       }
     }
   </style>
@@ -289,40 +289,34 @@
       <div class="controls">
         <div class="sliders">
           <div class="slider-block" data-key="sigma">
-            <div class="slider-header">
-              <div class="slider-symbol"><i>σ</i><sub>f</sub></div>
-              <div class="slider-value" id="sigma-value"></div>
-            </div>
+            <div class="slider-symbol"><i>σ</i><sub>f</sub></div>
             <div class="slider-wrap">
               <div class="slider-track"></div>
               <div class="optimum-marker" id="sigma-opt-marker"></div>
               <div class="optimum-label" id="sigma-opt-label"></div>
               <input id="sigma-slider" type="range" />
             </div>
+            <div class="slider-value" id="sigma-value"></div>
           </div>
           <div class="slider-block" data-key="length">
-            <div class="slider-header">
-              <div class="slider-symbol"><i>ℓ</i></div>
-              <div class="slider-value" id="length-value"></div>
-            </div>
+            <div class="slider-symbol"><i>ℓ</i></div>
             <div class="slider-wrap">
               <div class="slider-track"></div>
               <div class="optimum-marker" id="length-opt-marker"></div>
               <div class="optimum-label" id="length-opt-label"></div>
               <input id="length-slider" type="range" />
             </div>
+            <div class="slider-value" id="length-value"></div>
           </div>
           <div class="slider-block" data-key="beta">
-            <div class="slider-header">
-              <div class="slider-symbol"><i>β</i></div>
-              <div class="slider-value" id="beta-value"></div>
-            </div>
+            <div class="slider-symbol"><i>β</i></div>
             <div class="slider-wrap">
               <div class="slider-track"></div>
               <div class="optimum-marker" id="beta-opt-marker"></div>
               <div class="optimum-label" id="beta-opt-label"></div>
               <input id="beta-slider" type="range" />
             </div>
+            <div class="slider-value" id="beta-value"></div>
           </div>
         </div>
         <div class="matrix-card">
@@ -649,7 +643,7 @@
 
       function resize() {
         const width = Math.max(chartFrame.node().clientWidth, 320);
-        const height = Math.max(380, Math.round(width * 0.56));
+        const height = Math.max(420, Math.round(width * 0.58));
         svg.attr('viewBox', `0 0 ${width} ${height}`);
         layout = {
           width,
@@ -683,14 +677,14 @@
         renderLegend();
 
         const matrixWidth = Math.max(matrixFrame.node().clientWidth, 160);
-        const matrixHeight = Math.max(180, matrixWidth);
+        const matrixHeight = Math.max(matrixFrame.node().clientHeight, 104);
         matrixSvg.attr('viewBox', `0 0 ${matrixWidth} ${matrixHeight}`);
         renderMatrix();
       }
 
       function renderGrid() {
         if (!layout) return;
-        const xTicks = [0, Math.PI, TWO_PI];
+        const xTicks = [0, 2, 4, 6];
         const yTicks = [-1, 0, 1];
 
         const xGridLines = gridLayer.selectAll('.x-grid').data(xTicks);
@@ -711,11 +705,7 @@
           .attr('y2', (d) => yScale(d))
           .attr('stroke-width', 1);
 
-        axisBottom.call(d3v.axisBottom(xScale).tickValues(xTicks).tickFormat((d) => {
-          if (d === 0) return '0';
-          if (Math.abs(d - Math.PI) < 1e-6) return '\u03c0';
-          return '2\u03c0';
-        }));
+        axisBottom.call(d3v.axisBottom(xScale).tickValues(xTicks).tickFormat(d3v.format('.0f')));
         axisLeft.call(d3v.axisLeft(yScale).tickValues(yTicks));
       }
 
@@ -763,16 +753,18 @@
           { label: 'y(x) samples', type: 'sample', color: '#6f1d77' }
         ];
 
-        const rowHeight = 18;
+        const rowHeight = 17;
+        const paddingTop = 10;
+        const paddingBottom = 10;
         const width = 172;
-        const height = items.length * rowHeight + 14;
+        const height = items.length * rowHeight + paddingTop + paddingBottom;
         legendLayer.attr('transform', `translate(12,${layout.innerHeight - height - 10})`);
 
         const bg = legendLayer.selectAll('rect').data([null]);
-        bg.join('rect').attr('width', width).attr('height', height);
+        bg.join('rect').attr('class', 'legend-bg').attr('width', width).attr('height', height);
 
         const rows = legendLayer.selectAll('.legend-row').data(items).join('g').attr('class', 'legend-row')
-          .attr('transform', (_, i) => `translate(10,${12 + i * rowHeight})`);
+          .attr('transform', (_, i) => `translate(10,${paddingTop + 2 + i * rowHeight})`);
 
         rows.each(function(d) {
           const row = d3v.select(this);
@@ -788,18 +780,18 @@
               .attr('stroke-dasharray', d.type === 'line-dash' ? '6 5' : null)
               .attr('stroke-opacity', d.type === 'sample' ? 0.75 : 1);
           }
-          row.append('text').attr('x', 26).attr('y', 1).text(d.label);
+          row.append('text').attr('x', 26).attr('y', 1.5).text(d.label);
         });
       }
 
       function renderMatrix() {
         if (!state.model) return;
         const width = Math.max(matrixFrame.node().clientWidth, 160);
-        const height = Math.max(180, width);
-        const margin = { top: 10, right: 20, bottom: 26, left: 26 };
-        const innerSize = Math.min(width - margin.left - margin.right, height - margin.top - margin.bottom - 14);
+        const height = Math.max(matrixFrame.node().clientHeight, 104);
+        const margin = { top: 6, right: 12, bottom: 22, left: 22 };
+        const innerSize = Math.min(width - margin.left - margin.right, height - margin.top - margin.bottom - 12);
         const offsetX = (width - margin.left - margin.right - innerSize) / 2;
-        const offsetY = 6;
+        const offsetY = 2;
 
         matrixRoot.attr('transform', `translate(${margin.left + offsetX},${margin.top + offsetY})`);
         const cellSize = innerSize / MATRIX_COUNT;
@@ -845,7 +837,7 @@
 
         matrixAxis.append('text').attr('class', 'matrix-label').attr('x', innerSize / 2).attr('y', innerSize + 22).attr('text-anchor', 'middle').text('x');
         matrixAxis.append('text').attr('class', 'matrix-label').attr('transform', `translate(${-18},${innerSize / 2}) rotate(-90)`).attr('text-anchor', 'middle').text("x'");
-        matrixCaption.attr('x', innerSize / 2).attr('y', innerSize + 40);
+        matrixCaption.attr('x', innerSize / 2).attr('y', innerSize + 32);
       }
 
       function renderModel() {

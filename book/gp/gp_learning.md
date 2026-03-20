@@ -93,6 +93,6 @@ The widget below fixes three observations at $x=0.5$, $x=3.0$, and $x=5.5$ and l
 <iframe
   src="../_static/gp-learning-hyperparameters-interactive.html"
   title="Interactive Gaussian process hyperparameter explorer"
-  style="width: 100%; height: 760px; border: 0; overflow: hidden;"
+  style="width: 100%; height: 900px; border: 0; overflow: hidden;"
   loading="lazy"
 ></iframe>
