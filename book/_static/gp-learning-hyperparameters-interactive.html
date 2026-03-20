@@ -343,9 +343,10 @@
       };
 
       const observations = [
-        { x: 0.5, y: Math.sin(0.5) + 0.05 },
+        { x: 2.0, y: Math.sin(2.0) + 0.05 },
         { x: 3.0, y: Math.sin(3.0) - 0.07 },
-        { x: 5.5, y: Math.sin(5.5) + 0.06 }
+        { x: 4.0, y: Math.sin(4.0) + 0.04 },
+        { x: 5.0, y: Math.sin(5.0) - 0.05 }
       ];
 
       const state = {
@@ -492,8 +493,8 @@
           }
         }
 
-        const matrixIndices = d3v.range(MATRIX_COUNT).map((i) => Math.round((i / (MATRIX_COUNT - 1)) * (GRID_COUNT - 1)));
-        const matrixCov = matrixIndices.map((i) => matrixIndices.map((j) => posteriorCov[i][j]));
+        const matrixX = d3v.range(MATRIX_COUNT).map((i) => (i / (MATRIX_COUNT - 1)) * TWO_PI);
+        const matrixCov = matrixX.map((x1) => matrixX.map((x2) => kernel(x1, x2, sigma, length)));
 
         return {
           sigma,
