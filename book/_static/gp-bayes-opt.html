@@ -240,13 +240,13 @@
       const mode = (params.get('mode') || 'basic').toLowerCase();
       const MODES = {
         basic: {
-          title: 'Bayesian optimization game',
-          subtitle: 'Choose up to 5 input locations to discover the maximum of a hidden 1D objective sampled from a GP prior.',
+          title: 'Blind Bayesian Optimization',
+          subtitle: 'Choose up to 5 input locations to discover the maximum of a hidden 1D objective.',
           showAcquisition: false
         },
         ei: {
-          title: 'Bayesian optimization game with expected improvement',
-          subtitle: 'The same task, now with the Expected Improvement acquisition function shown in a second panel to guide sampling.',
+          title: 'Bayesian Optimization informed by Expected Improvement',
+          subtitle: 'The same task, now with the Expected Improvement acquisition function shown in a second panel.',
           showAcquisition: true
         }
       };
@@ -345,11 +345,6 @@
       const yLabel = axesLayer.append('text').attr('class', 'axis-label').attr('text-anchor', 'middle').text('Objective value');
       const acqLabel = axesLayer.append('text').attr('class', 'axis-label').attr('text-anchor', 'middle').text('Expected improvement');
 
-      const panelTitleMain = infoLayer.append('text').attr('class', 'panel-title').text('GP posterior over the hidden objective');
-      const panelTitleAcq = infoLayer.append('text').attr('class', 'panel-title').text('Acquisition: expected improvement');
-      const statusText = infoLayer.append('text').attr('class', 'status-text');
-      const scoreText = infoLayer.append('text').attr('class', 'score-text');
-      const acqCaption = infoLayer.append('text').attr('class', 'panel-caption');
 
       const interactionRect = overlayLayer.append('rect')
         .attr('fill', 'transparent')
@@ -643,18 +638,7 @@
       }
 
       function refreshStatus() {
-        const remaining = MAX_SAMPLES - state.observations.length;
-        const bestText = state.model && state.model.bestObserved != null
-          ? ` Best so far: ${state.model.bestObserved.toFixed(3)}.`
-          : '';
-        const suffix = state.finished ? ' Sampling budget exhausted.' : ` ${remaining} sample${remaining === 1 ? '' : 's'} remaining.`;
-        statusText.text(`Samples used: ${state.observations.length}/${MAX_SAMPLES}.${suffix}${bestText}`);
-        statusText.attr('fill', state.finished ? 'var(--c-warning)' : 'var(--c-muted)');
-        scoreText.text(scoreMessage());
-        scoreText.attr('fill', state.finished ? 'var(--c-good)' : 'var(--c-muted)');
-        acqCaption.text(state.observations.length === 0
-          ? 'Collect one observation before EI becomes informative.'
-          : `EI prefers x = ${state.model.suggestedX.toFixed(3)}.`);
+        return scoreMessage();
       }
 
       function renderPanels() {
@@ -990,18 +974,6 @@
           .attr('y', layout.main.top)
           .attr('width', layout.main.width)
           .attr('height', layout.main.height);
-
-        panelTitleMain.attr('x', layout.main.left).attr('y', layout.main.top - 18);
-        statusText.attr('x', layout.main.left).attr('y', 22);
-        scoreText.attr('x', layout.main.left + 230).attr('y', 22);
-
-        if (config.showAcquisition) {
-          panelTitleAcq.style('display', null).attr('x', layout.acq.left).attr('y', layout.acq.top - 18);
-          acqCaption.style('display', null).attr('x', layout.acq.left + 170).attr('y', layout.acq.top - 18);
-        } else {
-          panelTitleAcq.style('display', 'none');
-          acqCaption.style('display', 'none');
-        }
 
         renderPanels();
         renderGrid();

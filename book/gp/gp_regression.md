@@ -90,8 +90,8 @@ Note how all desirable features for a robust model are present:
 
 Below are two Bayesian optimization demos built on the same 1D GP regression model. In both widgets, the hidden objective is re-sampled from a GP prior every time the page loads or the reset button is pressed. You only get five evaluations, so the goal is to place them as carefully as possible to recover the maximum of the hidden function. The first widget leaves you on your own, while the second adds the Expected Improvement acquisition function as a guide.
 
-<iframe src="../_static/gp-bayes-opt.html?mode=basic" width="100%" height="620" frameborder="0"></iframe>
+<iframe src="../_static/gp-bayes-opt.html?mode=basic" width="100%" height="680" frameborder="0"></iframe>
 
-<iframe src="../_static/gp-bayes-opt.html?mode=ei" width="100%" height="820" frameborder="0"></iframe>
+<iframe src="../_static/gp-bayes-opt.html?mode=ei" width="100%" height="900" frameborder="0"></iframe>
 
 In the next page we will go through this last point, namely how to determine suitable values for the kernel hyperparameters.
