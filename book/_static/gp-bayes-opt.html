@@ -727,7 +727,7 @@
         const legendWidth = config.showAcquisition ? 190 : 176;
         const legendHeight = config.showAcquisition ? 110 : 92;
         const legendX = layout.main.left + layout.main.width - legendWidth - 12;
-        const legendY = layout.main.top + 12;
+        const legendY = layout.main.top + 4;
 
         legendLayer.selectAll('rect.legend-box').data([null]).join('rect')
           .attr('class', 'legend-box')
