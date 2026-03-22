@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bayesian optimization widget</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <style>
+    :root {
+      --c-mean: #0076c2;
+      --c-fill: #0076c2;
+      --c-grid: #ffffff;
+      --c-axis: #7f8794;
+      --c-border: #dde3ea;
+      --c-muted: #5f6b7a;
+      --c-surface: #ffffff;
+      --c-panel: #eaeaf2;
+      --c-observation: #111111;
+      --c-hover: #5f6b7a;
+      --c-truth: #a50034;
+      --c-optimum: #ec6842;
+      --c-acq: #6f1d77;
+      --c-acq-fill: #6f1d77;
+      --c-good: #0a7f4f;
+      --c-warning: #8f1d42;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #1b1f24;
+      background: var(--c-surface);
+    }
+
+    body { padding: 0; }
+
+    .widget-shell {
+      width: 100%;
+      max-width: 100%;
+      padding: 12px;
+      margin: 0 auto;
+      background: var(--c-surface);
+    }
+
+    .widget-card {
+      width: 100%;
+      border: 1px solid var(--c-border);
+      border-radius: 12px;
+      background: var(--c-surface);
+      box-shadow: 0 1px 3px rgba(12, 35, 64, 0.06);
+      overflow: hidden;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 14px 10px;
+      border-bottom: 1px solid #edf1f5;
+      background: #f7f9fb;
+    }
+
+    .title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #243140;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: var(--c-muted);
+      line-height: 1.35;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 1px solid #cfd7e3;
+      background: #ffffff;
+      color: #243140;
+      border-radius: 999px;
+      padding: 7px 12px;
+      cursor: pointer;
+      font-size: 0.84rem;
+      line-height: 1.2;
+      transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      background: #f5f8fc;
+      border-color: #b9c7d8;
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    .chart-panel {
+      padding: 10px;
+      background: #ffffff;
+    }
+
+    .chart-frame {
+      width: 100%;
+      border: 1px solid var(--c-border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--c-panel);
+    }
+
+    .chart-frame svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .legend text,
+    .axis text,
+    .axis-label,
+    .hover-label,
+    .annotation,
+    .status-text,
+    .panel-title,
+    .panel-caption,
+    .score-text {
+      font-family: inherit;
+    }
+
+    .axis path,
+    .axis line {
+      stroke: var(--c-axis);
+    }
+
+    .axis text,
+    .axis-label,
+    .panel-caption {
+      fill: #44505d;
+      font-size: 12px;
+    }
+
+    .grid line {
+      stroke: var(--c-grid);
+      stroke-opacity: 0.96;
+    }
+
+    .grid path { display: none; }
+
+    .legend text {
+      font-size: 12px;
+      fill: #243140;
+    }
+
+    .hover-line,
+    .cross-panel-line {
+      stroke: var(--c-hover);
+      stroke-width: 1.4;
+      stroke-dasharray: 5 5;
+      pointer-events: none;
+    }
+
+    .hover-label,
+    .panel-title,
+    .status-text,
+    .score-text {
+      font-size: 12px;
+      fill: var(--c-muted);
+    }
+
+    .hover-label,
+    .panel-title,
+    .score-text {
+      font-weight: 600;
+    }
+
+    .status-text,
+    .score-text {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .annotation {
+      font-size: 12px;
+      fill: var(--c-muted);
+    }
+
+    @media (max-width: 720px) {
+      .widget-shell { padding: 8px; }
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="widget-shell">
+    <div class="widget-card">
+      <div class="header">
+        <div class="title-group">
+          <div class="title" id="widget-title"></div>
+          <div class="subtitle" id="widget-subtitle"></div>
+        </div>
+        <div class="header-actions">
+          <button id="reveal-button" type="button">Reveal truth</button>
+          <button id="reset-button" type="button">Sample new function</button>
+        </div>
+      </div>
+      <div class="chart-panel">
+        <div class="chart-frame" id="chart-frame"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const d3v = window.d3;
+      if (!d3v) {
+        document.getElementById('chart-frame').innerHTML = '<p style="color:#b00020;padding:12px">D3 failed to load from CDN.</p>';
+        return;
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      const mode = (params.get('mode') || 'basic').toLowerCase();
+      const MODES = {
+        basic: {
+          title: 'Blind Bayesian Optimization',
+          subtitle: 'Choose up to 5 input locations to discover the maximum of a hidden 1D objective.',
+          showAcquisition: false
+        },
+        ei: {
+          title: 'Bayesian Optimization informed by Expected Improvement',
+          subtitle: 'The same task, now with the Expected Improvement acquisition function shown in a second panel.',
+          showAcquisition: true
+        }
+      };
+      const config = MODES[mode] || MODES.basic;
+
+      document.getElementById('widget-title').textContent = config.title;
+      document.getElementById('widget-subtitle').textContent = config.subtitle;
+
+      const DOMAIN = [0, 1];
+      const GRID_COUNT = 180;
+      const MAX_SAMPLES = 5;
+      const SIGMA_F = 1.0;
+      const LENGTH_SCALE = 0.16;
+      const OBS_NOISE_VAR = 1e-6;
+      const XI = 0.01;
+      const JITTER = 1e-9;
+      const TRANSITION_MS = 450;
+
+      const xGrid = d3v.range(GRID_COUNT).map((i) => DOMAIN[0] + (i / (GRID_COUNT - 1)) * (DOMAIN[1] - DOMAIN[0]));
+      const frame = d3v.select('#chart-frame');
+      const svg = frame.append('svg');
+      const defs = svg.append('defs');
+      defs.append('clipPath').attr('id', 'main-clip').append('rect');
+      defs.append('clipPath').attr('id', 'acq-clip').append('rect');
+
+      const root = svg.append('g');
+      const panelLayer = root.append('g');
+      const mainGridLayer = root.append('g').attr('class', 'grid');
+      const acqGridLayer = root.append('g').attr('class', 'grid');
+      const mainLayer = root.append('g').attr('clip-path', 'url(#main-clip)');
+      const acqLayer = root.append('g').attr('clip-path', 'url(#acq-clip)');
+      const overlayLayer = root.append('g');
+      const axesLayer = root.append('g');
+      const legendLayer = root.append('g').attr('class', 'legend');
+      const infoLayer = root.append('g');
+
+      const mainBandPath = mainLayer.append('path')
+        .attr('fill', 'var(--c-fill)')
+        .attr('fill-opacity', 0.16)
+        .attr('stroke', 'none');
+
+      const mainMeanPath = mainLayer.append('path')
+        .attr('fill', 'none')
+        .attr('stroke', 'var(--c-mean)')
+        .attr('stroke-width', 2.6)
+        .attr('stroke-linejoin', 'round')
+        .attr('stroke-linecap', 'round');
+
+      const truthPath = mainLayer.append('path')
+        .attr('fill', 'none')
+        .attr('stroke', 'var(--c-truth)')
+        .attr('stroke-width', 2.2)
+        .attr('stroke-dasharray', '6 4')
+        .style('opacity', 0);
+
+      const optimumLine = mainLayer.append('line')
+        .attr('stroke', 'var(--c-optimum)')
+        .attr('stroke-width', 1.8)
+        .attr('stroke-dasharray', '4 4')
+        .style('opacity', 0);
+
+      const optimumDot = mainLayer.append('circle')
+        .attr('r', 4.5)
+        .attr('fill', 'var(--c-optimum)')
+        .style('opacity', 0);
+
+      const observationLayer = mainLayer.append('g');
+
+      const acqAreaPath = acqLayer.append('path')
+        .attr('fill', 'var(--c-acq-fill)')
+        .attr('fill-opacity', 0.15)
+        .attr('stroke', 'none');
+
+      const acqLinePath = acqLayer.append('path')
+        .attr('fill', 'none')
+        .attr('stroke', 'var(--c-acq)')
+        .attr('stroke-width', 2.3)
+        .attr('stroke-linejoin', 'round')
+        .attr('stroke-linecap', 'round');
+
+      const acqSuggestionLine = acqLayer.append('line')
+        .attr('stroke', 'var(--c-acq)')
+        .attr('stroke-width', 1.5)
+        .attr('stroke-dasharray', '4 4')
+        .style('opacity', 0);
+
+      const hoverLineMain = overlayLayer.append('line').attr('class', 'hover-line').style('opacity', 0);
+      const hoverLineAcq = overlayLayer.append('line').attr('class', 'cross-panel-line').style('opacity', 0);
+      const hoverLabel = overlayLayer.append('text').attr('class', 'hover-label').attr('text-anchor', 'middle').style('opacity', 0);
+
+      const mainAxisBottom = axesLayer.append('g').attr('class', 'axis');
+      const mainAxisLeft = axesLayer.append('g').attr('class', 'axis');
+      const acqAxisLeft = axesLayer.append('g').attr('class', 'axis');
+      const xAxisBottom = axesLayer.append('g').attr('class', 'axis');
+      const xLabel = axesLayer.append('text').attr('class', 'axis-label').attr('text-anchor', 'middle').text('x');
+      const yLabel = axesLayer.append('text').attr('class', 'axis-label').attr('text-anchor', 'middle').text('Objective value');
+      const acqLabel = axesLayer.append('text').attr('class', 'axis-label').attr('text-anchor', 'middle').text('Expected improvement');
+
+
+      const interactionRect = overlayLayer.append('rect')
+        .attr('fill', 'transparent')
+        .style('cursor', 'crosshair');
+
+      const xScale = d3v.scaleLinear().domain(DOMAIN);
+      const yScale = d3v.scaleLinear();
+      const acqScale = d3v.scaleLinear();
+
+      const lineGenerator = d3v.line().x((d) => xScale(d.x)).y((d) => yScale(d.y)).curve(d3v.curveBasis);
+      const areaGenerator = d3v.area().x((d) => xScale(d.x)).y0((d) => yScale(d.lower)).y1((d) => yScale(d.upper)).curve(d3v.curveBasis);
+      const acqLineGenerator = d3v.line().x((d) => xScale(d.x)).y((d) => acqScale(d.y)).curve(d3v.curveBasis);
+      const acqAreaGenerator = d3v.area().x((d) => xScale(d.x)).y0(() => acqScale(0)).y1((d) => acqScale(d.y)).curve(d3v.curveBasis);
+
+      let layout = null;
+      const state = {
+        observations: [],
+        hoveredX: null,
+        truth: [],
+        truthSeed: 0,
+        trueMaximum: null,
+        trueArgmax: null,
+        model: null,
+        revealTruth: false,
+        finished: false,
+        suggestedX: null
+      };
+
+      function mulberry32(seed) {
+        let a = seed >>> 0;
+        return function random() {
+          a = (a + 0x6D2B79F5) >>> 0;
+          let t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function randomNormal(rng = Math.random) {
+        let u = 0;
+        let v = 0;
+        while (u === 0) u = rng();
+        while (v === 0) v = rng();
+        return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+      }
+
+      function kernel(a, b) {
+        const diff = a - b;
+        return SIGMA_F * SIGMA_F * Math.exp(-0.5 * (diff * diff) / (LENGTH_SCALE * LENGTH_SCALE));
+      }
+
+      function cholesky(matrix) {
+        const n = matrix.length;
+        const L = Array.from({ length: n }, () => Array(n).fill(0));
+        for (let i = 0; i < n; i += 1) {
+          for (let j = 0; j <= i; j += 1) {
+            let sum = matrix[i][j];
+            for (let k = 0; k < j; k += 1) sum -= L[i][k] * L[j][k];
+            if (i === j) {
+              L[i][j] = Math.sqrt(Math.max(sum, JITTER));
+            } else {
+              L[i][j] = sum / L[j][j];
+            }
+          }
+        }
+        return L;
+      }
+
+      function solveLower(L, b) {
+        const n = L.length;
+        const x = Array(n).fill(0);
+        for (let i = 0; i < n; i += 1) {
+          let sum = b[i];
+          for (let j = 0; j < i; j += 1) sum -= L[i][j] * x[j];
+          x[i] = sum / L[i][i];
+        }
+        return x;
+      }
+
+      function solveUpperFromLower(L, b) {
+        const n = L.length;
+        const x = Array(n).fill(0);
+        for (let i = n - 1; i >= 0; i -= 1) {
+          let sum = b[i];
+          for (let j = i + 1; j < n; j += 1) sum -= L[j][i] * x[j];
+          x[i] = sum / L[i][i];
+        }
+        return x;
+      }
+
+      function solveWithCholesky(L, b) {
+        return solveUpperFromLower(L, solveLower(L, b));
+      }
+
+      function solveMatrixWithCholesky(L, B) {
+        return B.map((column) => solveWithCholesky(L, column));
+      }
+
+      function normalPdf(z) {
+        return Math.exp(-0.5 * z * z) / Math.sqrt(2 * Math.PI);
+      }
+
+      function erfApprox(x) {
+        const sign = x < 0 ? -1 : 1;
+        const absX = Math.abs(x);
+        const a1 = 0.254829592;
+        const a2 = -0.284496736;
+        const a3 = 1.421413741;
+        const a4 = -1.453152027;
+        const a5 = 1.061405429;
+        const p = 0.3275911;
+        const t = 1 / (1 + p * absX);
+        const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-absX * absX);
+        return sign * y;
+      }
+
+      function normalCdf(z) {
+        return 0.5 * (1 + erfApprox(z / Math.SQRT2));
+      }
+
+      function sampleTruth(seed) {
+        const rng = mulberry32(seed);
+        const cov = Array.from({ length: GRID_COUNT }, (_, i) => Array.from({ length: GRID_COUNT }, (_, j) => kernel(xGrid[i], xGrid[j]) + (i === j ? JITTER : 0)));
+        const L = cholesky(cov);
+        const z = Array.from({ length: GRID_COUNT }, () => randomNormal(rng));
+        const values = Array(GRID_COUNT).fill(0);
+        for (let i = 0; i < GRID_COUNT; i += 1) {
+          let sum = 0;
+          for (let j = 0; j <= i; j += 1) sum += L[i][j] * z[j];
+          values[i] = sum;
+        }
+        return xGrid.map((x, i) => ({ x, y: values[i] }));
+      }
+
+      function interpolateTruth(x) {
+        if (x <= xGrid[0]) return state.truth[0].y;
+        if (x >= xGrid[xGrid.length - 1]) return state.truth[state.truth.length - 1].y;
+        const t = (x - DOMAIN[0]) / (DOMAIN[1] - DOMAIN[0]);
+        const index = Math.min(xGrid.length - 2, Math.max(0, Math.floor(t * (xGrid.length - 1))));
+        const left = state.truth[index];
+        const right = state.truth[index + 1];
+        const ratio = (x - left.x) / (right.x - left.x);
+        return left.y * (1 - ratio) + right.y * ratio;
+      }
+
+      function nearestGridIndex(x) {
+        const t = (x - DOMAIN[0]) / (DOMAIN[1] - DOMAIN[0]);
+        return Math.max(0, Math.min(xGrid.length - 1, Math.round(t * (xGrid.length - 1))));
+      }
+
+      function computeModel(observations) {
+        const n = observations.length;
+        const posteriorCov = Array.from({ length: GRID_COUNT }, () => Array(GRID_COUNT).fill(0));
+        const gridToXCov = Array.from({ length: GRID_COUNT }, () => Array(n).fill(0));
+        const mean = Array(GRID_COUNT).fill(0);
+        const variance = Array(GRID_COUNT).fill(SIGMA_F * SIGMA_F);
+
+        for (let i = 0; i < GRID_COUNT; i += 1) {
+          for (let j = 0; j < GRID_COUNT; j += 1) posteriorCov[i][j] = kernel(xGrid[i], xGrid[j]);
+        }
+
+        if (n === 0) {
+          const interval = mean.map((value, i) => ({
+            x: xGrid[i],
+            lower: value - 1.96 * Math.sqrt(Math.max(variance[i], 0)),
+            upper: value + 1.96 * Math.sqrt(Math.max(variance[i], 0))
+          }));
+          const acquisition = mean.map((_, i) => ({ x: xGrid[i], y: 0 }));
+          return {
+            mean,
+            variance,
+            posteriorCov,
+            interval,
+            acquisition,
+            bestObserved: null,
+            bestIndex: null,
+            suggestedX: null
+          };
+        }
+
+        const X = observations.map((d) => d.x);
+        const y = observations.map((d) => d.y);
+        const Kxx = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => kernel(X[i], X[j]) + (i === j ? OBS_NOISE_VAR : 0)));
+        const L = cholesky(Kxx);
+        const alpha = solveWithCholesky(L, y);
+
+        for (let i = 0; i < GRID_COUNT; i += 1) {
+          for (let j = 0; j < n; j += 1) gridToXCov[i][j] = kernel(xGrid[i], X[j]);
+        }
+
+        for (let i = 0; i < GRID_COUNT; i += 1) {
+          let value = 0;
+          for (let j = 0; j < n; j += 1) value += gridToXCov[i][j] * alpha[j];
+          mean[i] = value;
+        }
+
+        const solvedColumns = solveMatrixWithCholesky(L, Array.from({ length: GRID_COUNT }, (_, i) => gridToXCov[i]));
+        for (let i = 0; i < GRID_COUNT; i += 1) {
+          for (let j = 0; j < GRID_COUNT; j += 1) {
+            let reduction = 0;
+            for (let k = 0; k < n; k += 1) reduction += gridToXCov[i][k] * solvedColumns[j][k];
+            posteriorCov[i][j] -= reduction;
+          }
+          posteriorCov[i][i] = Math.max(posteriorCov[i][i], 0);
+          variance[i] = posteriorCov[i][i];
+        }
+
+        const interval = mean.map((value, i) => ({
+          x: xGrid[i],
+          lower: value - 1.96 * Math.sqrt(Math.max(variance[i], 0)),
+          upper: value + 1.96 * Math.sqrt(Math.max(variance[i], 0))
+        }));
+
+        let bestObserved = -Infinity;
+        let bestObservedX = null;
+        observations.forEach((obs) => {
+          if (obs.y > bestObserved) {
+            bestObserved = obs.y;
+            bestObservedX = obs.x;
+          }
+        });
+
+        const acquisition = mean.map((mu, i) => {
+          const sigma = Math.sqrt(Math.max(variance[i], 0));
+          if (sigma < 1e-10) return { x: xGrid[i], y: Math.max(mu - bestObserved - XI, 0) };
+          const improvement = mu - bestObserved - XI;
+          const z = improvement / sigma;
+          return { x: xGrid[i], y: improvement * normalCdf(z) + sigma * normalPdf(z) };
+        });
+
+        let bestIndex = 0;
+        for (let i = 1; i < acquisition.length; i += 1) {
+          if (acquisition[i].y > acquisition[bestIndex].y) bestIndex = i;
+        }
+
+        return {
+          mean,
+          variance,
+          posteriorCov,
+          interval,
+          acquisition,
+          bestObserved,
+          bestObservedX,
+          bestIndex,
+          suggestedX: acquisition[bestIndex]?.x ?? null
+        };
+      }
+
+      function yDomainFromState() {
+        const values = [];
+        state.truth.forEach((d) => values.push(d.y));
+        if (state.model) {
+          state.model.interval.forEach((d) => {
+            values.push(d.lower, d.upper);
+          });
+        }
+        state.observations.forEach((d) => values.push(d.y));
+        const minValue = d3v.min(values);
+        const maxValue = d3v.max(values);
+        const span = Math.max(1.4, maxValue - minValue);
+        return [minValue - 0.18 * span, maxValue + 0.22 * span];
+      }
+
+      function acquisitionDomain() {
+        if (!config.showAcquisition || !state.model) return [0, 1];
+        const maxValue = Math.max(0.08, d3v.max(state.model.acquisition, (d) => d.y) || 0.08);
+        return [0, maxValue * 1.15];
+      }
+
+      function updateTruthExtrema() {
+        let best = state.truth[0];
+        for (let i = 1; i < state.truth.length; i += 1) {
+          if (state.truth[i].y > best.y) best = state.truth[i];
+        }
+        state.trueMaximum = best.y;
+        state.trueArgmax = best.x;
+      }
+
+      function scoreMessage() {
+        if (state.observations.length === 0) return 'No samples yet.';
+        const bestObs = state.observations.reduce((best, obs) => (obs.y > best.y ? obs : best), state.observations[0]);
+        const regret = state.trueMaximum - bestObs.y;
+        if (!state.finished && !state.revealTruth) {
+          return `Best observed value: ${bestObs.y.toFixed(3)} at x = ${bestObs.x.toFixed(3)}.`;
+        }
+        return `Best observed value: ${bestObs.y.toFixed(3)} at x = ${bestObs.x.toFixed(3)}. True max: ${state.trueMaximum.toFixed(3)} at x = ${state.trueArgmax.toFixed(3)}. Gap: ${regret.toFixed(3)}.`;
+      }
+
+      function refreshButtons() {
+        d3v.select('#reveal-button').text(state.revealTruth ? 'Hide truth' : 'Reveal truth');
+      }
+
+      function refreshStatus() {
+        return scoreMessage();
+      }
+
+      function renderPanels() {
+        if (!layout) return;
+        panelLayer.selectAll('rect.panel-main').data([null]).join('rect')
+          .attr('class', 'panel-main')
+          .attr('x', layout.main.left)
+          .attr('y', layout.main.top)
+          .attr('width', layout.main.width)
+          .attr('height', layout.main.height)
+          .attr('fill', 'var(--c-panel)');
+
+        const acqData = config.showAcquisition ? [null] : [];
+        panelLayer.selectAll('rect.panel-acq').data(acqData).join('rect')
+          .attr('class', 'panel-acq')
+          .attr('x', layout.acq.left)
+          .attr('y', layout.acq.top)
+          .attr('width', layout.acq.width)
+          .attr('height', layout.acq.height)
+          .attr('fill', '#f4f0f7');
+      }
+
+      function renderGrid() {
+        mainGridLayer
+          .attr('transform', `translate(${layout.main.left},0)`)
+          .call(d3v.axisLeft(yScale).ticks(5).tickSize(-layout.main.width).tickFormat(''));
+
+        if (config.showAcquisition) {
+          acqGridLayer
+            .style('display', null)
+            .attr('transform', `translate(${layout.acq.left},0)`)
+            .call(d3v.axisLeft(acqScale).ticks(3).tickSize(-layout.acq.width).tickFormat(''));
+        } else {
+          acqGridLayer.style('display', 'none');
+        }
+      }
+
+      function renderAxes() {
+        mainAxisBottom
+          .attr('transform', `translate(0, ${layout.main.top + layout.main.height})`)
+          .call(d3v.axisBottom(xScale).ticks(6));
+
+        mainAxisLeft
+          .attr('transform', `translate(${layout.main.left}, 0)`)
+          .call(d3v.axisLeft(yScale).ticks(5));
+
+        if (config.showAcquisition) {
+          acqAxisLeft
+            .style('display', null)
+            .attr('transform', `translate(${layout.acq.left}, 0)`)
+            .call(d3v.axisLeft(acqScale).ticks(3));
+          xAxisBottom
+            .style('display', null)
+            .attr('transform', `translate(0, ${layout.acq.top + layout.acq.height})`)
+            .call(d3v.axisBottom(xScale).ticks(6));
+        } else {
+          acqAxisLeft.style('display', 'none');
+          xAxisBottom.style('display', 'none');
+        }
+
+        xLabel
+          .attr('x', layout.main.left + layout.main.width / 2)
+          .attr('y', config.showAcquisition ? layout.acq.top + layout.acq.height + 42 : layout.main.top + layout.main.height + 42);
+
+        yLabel
+          .attr('transform', `translate(${layout.main.left - 44}, ${layout.main.top + layout.main.height / 2}) rotate(-90)`);
+
+        if (config.showAcquisition) {
+          acqLabel
+            .style('display', null)
+            .attr('transform', `translate(${layout.acq.left - 44}, ${layout.acq.top + layout.acq.height / 2}) rotate(-90)`);
+        } else {
+          acqLabel.style('display', 'none');
+        }
+      }
+
+      function renderLegend() {
+        const items = [
+          { label: '95% posterior interval', type: 'fill', color: 'var(--c-fill)' },
+          { label: 'Posterior mean', type: 'line', color: 'var(--c-mean)' },
+          { label: 'Observed values', type: 'point', color: 'var(--c-observation)' },
+          { label: 'True objective (revealed)', type: 'line-dashed', color: 'var(--c-truth)' }
+        ];
+        if (config.showAcquisition) items.push({ label: 'Expected improvement', type: 'acq', color: 'var(--c-acq)' });
+
+        const legendWidth = config.showAcquisition ? 190 : 176;
+        const legendHeight = config.showAcquisition ? 110 : 92;
+        const legendX = layout.main.left + layout.main.width - legendWidth - 12;
+        const legendY = layout.main.top + 4;
+
+        legendLayer.selectAll('rect.legend-box').data([null]).join('rect')
+          .attr('class', 'legend-box')
+          .attr('x', legendX)
+          .attr('y', legendY)
+          .attr('width', legendWidth)
+          .attr('height', legendHeight)
+          .attr('rx', 8)
+          .attr('ry', 8)
+          .attr('fill', 'rgba(255,255,255,0.88)')
+          .attr('stroke', '#cfd7e3');
+
+        const rows = legendLayer.selectAll('g.legend-row').data(items, (d) => d.label);
+        const enter = rows.enter().append('g').attr('class', 'legend-row');
+        enter.append('line');
+        enter.append('rect');
+        enter.append('circle');
+        enter.append('text');
+
+        enter.merge(rows)
+          .attr('transform', (_, i) => `translate(${legendX + 12}, ${legendY + 18 + i * 18})`)
+          .each(function eachRow(item) {
+            const row = d3v.select(this);
+            row.select('line')
+              .attr('x1', 0)
+              .attr('x2', 22)
+              .attr('y1', 0)
+              .attr('y2', 0)
+              .attr('stroke', item.color)
+              .attr('stroke-width', item.type === 'line' ? 2.6 : 1.7)
+              .attr('stroke-dasharray', item.type === 'line-dashed' ? '5 4' : item.type === 'acq' ? null : null)
+              .style('display', item.type === 'fill' || item.type === 'point' ? 'none' : null);
+            row.select('rect')
+              .attr('x', 0)
+              .attr('y', -5)
+              .attr('width', 22)
+              .attr('height', 10)
+              .attr('fill', item.color)
+              .attr('opacity', item.type === 'fill' ? 0.16 : 0)
+              .style('display', item.type === 'fill' ? null : 'none');
+            row.select('circle')
+              .attr('cx', 11)
+              .attr('cy', 0)
+              .attr('r', 3.4)
+              .attr('fill', item.color)
+              .style('display', item.type === 'point' ? null : 'none');
+            row.select('text')
+              .attr('x', 30)
+              .attr('y', 4)
+              .text(item.label);
+          });
+
+        rows.exit().remove();
+      }
+
+      function renderObservations() {
+        const circles = observationLayer.selectAll('circle.observation').data(state.observations, (d) => d.id);
+        circles.enter()
+          .append('circle')
+          .attr('class', 'observation')
+          .attr('cx', (d) => xScale(d.x))
+          .attr('cy', (d) => yScale(d.y))
+          .attr('r', 0)
+          .attr('fill', 'var(--c-observation)')
+          .transition()
+          .duration(320)
+          .ease(d3v.easeBackOut.overshoot(1.4))
+          .attr('r', 4.1);
+
+        circles.transition().duration(TRANSITION_MS)
+          .attr('cx', (d) => xScale(d.x))
+          .attr('cy', (d) => yScale(d.y))
+          .attr('r', 4.1);
+
+        circles.exit().remove();
+      }
+
+      function renderTruth() {
+        truthPath.attr('d', lineGenerator(state.truth));
+        const visible = state.revealTruth || state.finished;
+        truthPath.transition().duration(250).style('opacity', visible ? 0.95 : 0);
+        optimumLine
+          .attr('x1', xScale(state.trueArgmax))
+          .attr('x2', xScale(state.trueArgmax))
+          .attr('y1', yScale.range()[0])
+          .attr('y2', yScale(state.trueMaximum))
+          .transition().duration(250)
+          .style('opacity', visible ? 0.85 : 0);
+        optimumDot
+          .attr('cx', xScale(state.trueArgmax))
+          .attr('cy', yScale(state.trueMaximum))
+          .transition().duration(250)
+          .style('opacity', visible ? 1 : 0);
+      }
+
+      function renderMainCurves(previousModel = null) {
+        if (!state.model) return;
+        const nextMean = xGrid.map((x, i) => ({ x, y: state.model.mean[i] }));
+        const previousMean = previousModel ? xGrid.map((x, i) => ({ x, y: previousModel.mean[i] })) : nextMean;
+        const previousBand = previousModel ? previousModel.interval : state.model.interval;
+
+        mainBandPath
+          .datum(previousBand)
+          .attr('d', areaGenerator)
+          .transition()
+          .duration(TRANSITION_MS)
+          .ease(d3v.easeCubicInOut)
+          .attrTween('d', function tweenBand() {
+            const interp = d3v.interpolateArray(previousBand, state.model.interval);
+            return (t) => areaGenerator(interp(t));
+          });
+
+        mainMeanPath
+          .datum(previousMean)
+          .attr('d', lineGenerator)
+          .transition()
+          .duration(TRANSITION_MS)
+          .ease(d3v.easeCubicInOut)
+          .attrTween('d', function tweenLine() {
+            const interp = d3v.interpolateArray(previousMean, nextMean);
+            return (t) => lineGenerator(interp(t));
+          });
+      }
+
+      function renderAcquisition(previousModel = null) {
+        if (!config.showAcquisition || !state.model) {
+          acqAreaPath.style('display', 'none');
+          acqLinePath.style('display', 'none');
+          acqSuggestionLine.style('opacity', 0);
+          return;
+        }
+
+        acqAreaPath.style('display', null);
+        acqLinePath.style('display', null);
+
+        const prevAcq = previousModel ? previousModel.acquisition : state.model.acquisition;
+        acqAreaPath
+          .datum(prevAcq)
+          .attr('d', acqAreaGenerator)
+          .transition()
+          .duration(TRANSITION_MS)
+          .ease(d3v.easeCubicInOut)
+          .attrTween('d', function tweenAcqArea() {
+            const interp = d3v.interpolateArray(prevAcq, state.model.acquisition);
+            return (t) => acqAreaGenerator(interp(t));
+          });
+
+        acqLinePath
+          .datum(prevAcq)
+          .attr('d', acqLineGenerator)
+          .transition()
+          .duration(TRANSITION_MS)
+          .ease(d3v.easeCubicInOut)
+          .attrTween('d', function tweenAcqLine() {
+            const interp = d3v.interpolateArray(prevAcq, state.model.acquisition);
+            return (t) => acqLineGenerator(interp(t));
+          });
+
+        const showSuggestion = state.observations.length > 0 && state.model.suggestedX != null;
+        acqSuggestionLine
+          .attr('x1', xScale(state.model.suggestedX || 0))
+          .attr('x2', xScale(state.model.suggestedX || 0))
+          .attr('y1', layout.acq.top + layout.acq.height)
+          .attr('y2', acqScale(d3v.max(state.model.acquisition, (d) => d.y) || 0))
+          .style('opacity', showSuggestion ? 0.8 : 0);
+      }
+
+      function renderHover() {
+        if (state.hoveredX == null || !layout || state.finished) {
+          hoverLineMain.style('opacity', 0);
+          hoverLineAcq.style('opacity', 0);
+          hoverLabel.style('opacity', 0);
+          interactionRect.style('cursor', state.finished ? 'default' : 'crosshair');
+          return;
+        }
+
+        const xPos = xScale(state.hoveredX);
+        hoverLineMain
+          .style('opacity', 1)
+          .attr('x1', xPos)
+          .attr('x2', xPos)
+          .attr('y1', layout.main.top)
+          .attr('y2', layout.main.top + layout.main.height);
+
+        if (config.showAcquisition) {
+          hoverLineAcq
+            .style('opacity', 1)
+            .attr('x1', xPos)
+            .attr('x2', xPos)
+            .attr('y1', layout.acq.top)
+            .attr('y2', layout.acq.top + layout.acq.height);
+        } else {
+          hoverLineAcq.style('opacity', 0);
+        }
+
+        hoverLabel
+          .style('opacity', 1)
+          .attr('x', xPos)
+          .attr('y', layout.main.top + 16)
+          .text(`sample at x = ${state.hoveredX.toFixed(3)}`);
+      }
+
+      function resize() {
+        const frameWidth = frame.node().clientWidth || document.body.clientWidth || 900;
+        const width = Math.max(540, frameWidth);
+        const height = config.showAcquisition
+          ? Math.max(660, Math.round(width * 0.9))
+          : Math.max(500, Math.round(width * 0.68));
+
+        const margin = { top: 46, right: 18, bottom: 54, left: 62 };
+        const innerWidth = width - margin.left - margin.right;
+        const gap = config.showAcquisition ? 46 : 0;
+        const mainHeight = config.showAcquisition ? Math.round((height - margin.top - margin.bottom - gap) * 0.68) : height - margin.top - margin.bottom;
+        const acqHeight = config.showAcquisition ? height - margin.top - margin.bottom - gap - mainHeight : 0;
+
+        layout = {
+          width,
+          height,
+          main: { left: margin.left, top: margin.top, width: innerWidth, height: mainHeight },
+          acq: { left: margin.left, top: margin.top + mainHeight + gap, width: innerWidth, height: acqHeight },
+          margin,
+          gap
+        };
+
+        svg.attr('viewBox', `0 0 ${width} ${height}`);
+        xScale.range([layout.main.left, layout.main.left + layout.main.width]);
+        yScale.range([layout.main.top + layout.main.height, layout.main.top]).domain(yDomainFromState());
+        acqScale.range([layout.acq.top + layout.acq.height, layout.acq.top]).domain(acquisitionDomain());
+
+        defs.select('#main-clip rect')
+          .attr('x', layout.main.left)
+          .attr('y', layout.main.top)
+          .attr('width', layout.main.width)
+          .attr('height', layout.main.height);
+
+        defs.select('#acq-clip rect')
+          .attr('x', layout.acq.left)
+          .attr('y', layout.acq.top)
+          .attr('width', layout.acq.width)
+          .attr('height', layout.acq.height);
+
+        interactionRect
+          .attr('x', layout.main.left)
+          .attr('y', layout.main.top)
+          .attr('width', layout.main.width)
+          .attr('height', layout.main.height);
+
+        renderPanels();
+        renderGrid();
+        renderAxes();
+        if (state.model) {
+          mainBandPath.attr('d', areaGenerator(state.model.interval));
+          mainMeanPath.attr('d', lineGenerator(xGrid.map((x, i) => ({ x, y: state.model.mean[i] }))));
+          if (config.showAcquisition) {
+            acqAreaPath.attr('d', acqAreaGenerator(state.model.acquisition));
+            acqLinePath.attr('d', acqLineGenerator(state.model.acquisition));
+          }
+        }
+        renderTruth();
+        renderObservations();
+        renderHover();
+        renderLegend();
+        refreshStatus();
+      }
+
+      function refreshModel(previousModel = null) {
+        state.model = computeModel(state.observations);
+        state.suggestedX = state.model.suggestedX;
+        state.finished = state.observations.length >= MAX_SAMPLES;
+        if (layout) {
+          yScale.domain(yDomainFromState());
+          acqScale.domain(acquisitionDomain());
+          renderGrid();
+          renderAxes();
+          renderMainCurves(previousModel);
+          renderAcquisition(previousModel);
+          renderTruth();
+          renderObservations();
+          renderHover();
+          renderLegend();
+          refreshStatus();
+        }
+      }
+
+      function setNewTruth() {
+        state.truthSeed = (Math.random() * 0xFFFFFFFF) >>> 0;
+        state.truth = sampleTruth(state.truthSeed);
+        updateTruthExtrema();
+        state.observations = [];
+        state.hoveredX = null;
+        state.revealTruth = false;
+        state.finished = false;
+        refreshButtons();
+        const previousModel = state.model;
+        refreshModel(previousModel);
+      }
+
+      function handleHover(event) {
+        if (!layout || state.finished) return;
+        const [mx] = d3v.pointer(event, svg.node());
+        const clamped = Math.max(layout.main.left, Math.min(layout.main.left + layout.main.width, mx));
+        const x = xScale.invert(clamped);
+        const snapped = xGrid[nearestGridIndex(x)];
+        state.hoveredX = snapped;
+        renderHover();
+      }
+
+      function handleClick(event) {
+        if (state.finished) return;
+        handleHover(event);
+        if (state.hoveredX == null) return;
+        const x = state.hoveredX;
+        const y = interpolateTruth(x);
+        state.observations.push({ id: `${Date.now()}-${state.observations.length}`, x, y });
+        const previousModel = state.model;
+        refreshModel(previousModel);
+      }
+
+      interactionRect
+        .on('mouseenter', handleHover)
+        .on('mousemove', handleHover)
+        .on('mouseleave', () => {
+          state.hoveredX = null;
+          renderHover();
+        })
+        .on('click', handleClick);
+
+      d3v.select('#reset-button').on('click', () => {
+        setNewTruth();
+        resize();
+      });
+
+      d3v.select('#reveal-button').on('click', () => {
+        state.revealTruth = !state.revealTruth;
+        refreshButtons();
+        renderTruth();
+        refreshStatus();
+      });
+
+      setNewTruth();
+      resize();
+      new ResizeObserver(() => resize()).observe(document.body);
+    })();
+  </script>
+</body>
+</html>
