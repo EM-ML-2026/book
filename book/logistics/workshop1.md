@@ -58,8 +58,8 @@ $$
 $$
 
 which, in component form, read as
-$$
 
+$$
 P_{ij} = \frac{\partial W}{\partial F_{ij}} = 2C_1F_{ij}+4C_2(I_1-3)F_{ij}-2C_1F^{-1}_{ji}+K(J-1)JF^{-1}_{ji}
 $$
 
