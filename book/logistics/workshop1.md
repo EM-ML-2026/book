@@ -40,22 +40,29 @@ Make sure your IDE (e.g VS Code) is using the correct environment. Then load the
 ## Fitting data coming from a Bertoldi-Boyce hyperelastic model
 
 Consider a known explicit Bertoldi-Boyce hyperelastic constitutive law in two-dimensional setting under plane strain assumption, given by its energy density as
+
 $$
 W(\boldsymbol{F}) = C_1(I_1-3)+C_2(I_1-3)^2-2C_1\log(J)+\frac{1}{2}K(J-1)^2,
 $$
+
 where $\boldsymbol{F}(\vec{X}) = \boldsymbol{I} + (\vec{\nabla}\vec{u}(\vec{X}))^\mathsf{T}$ is the deformation gradient, $\boldsymbol{I} = \sum_{i=1}^3\vec{e}_i\vec{e}_i$ is the identity tensor with respect to a selected Cartesian coordinate basis $\{ \vec{e}_1, \vec{e}_2, \vec{e}_3 \}$, $\vec{\nabla} = \sum_{i=1}^3\frac{\partial}{\partial X_i}\vec{e}_i$ is the gradient operator with respect to the reference configuration, $\vec{u}(\vec{X})$ the displacement field, $I_1 = \mathrm{tr}{\boldsymbol{C}}$ is the first invariant of the right Cauchy-Green deformation tensor $\boldsymbol{C} = \boldsymbol{F}^\mathsf{T}\cdot\boldsymbol{F}$, $\boldsymbol{A}\cdot\boldsymbol{B}$ denotes contraction between two second-order tensors, $J = \det{\boldsymbol{F}}$, and $C_1$, $C_2$, and $K$ are material constants. 
 
 For hyperelastic materials, the corresponding first Piola-Kirchhoff (1PK) stress and its constitutive tangent are obtained from the energy density potential above as
+
 $$
 \boldsymbol{P}(\boldsymbol{F}) = \frac{\partial W(\boldsymbol{F})}{\partial\boldsymbol{F}},
 $$
+
 $$
 ^{4}\boldsymbol{D}(\boldsymbol{F}) = \frac{\partial^2 W(\boldsymbol{F})}{\partial\boldsymbol{F}\partial\boldsymbol{F}} = \frac{\partial\boldsymbol{P}(\boldsymbol{F})}{\partial\boldsymbol{F}},
 $$
+
 which, in component form, read as
 $$
+
 P_{ij} = \frac{\partial W}{\partial F_{ij}} = 2C_1F_{ij}+4C_2(I_1-3)F_{ij}-2C_1F^{-1}_{ji}+K(J-1)JF^{-1}_{ji}
 $$
+
 $$
 D_{ijkl} = \frac{\partial^2W}{\partial F_{ij}\partial F_{kl}} = \frac{\partial P_{ij}}{\partial F_{kl}} = 2C_1\delta_{ik}\delta_{jl}+8C_2F_{kl}F_{ij}+4C_2(I_1-3)\delta_{ik}\delta_{jl}+
 2C_1F^{-1}_{li}F^{-1}_{jk}+KJ^2F^{-1}_{ji}F^{-1}_{lk}+KJ(J-1)F^{-1}_{ji}F^{-1}_{lk}-KJ(J-1)F^{-1}_{li}F^{-1}_{jk}.
