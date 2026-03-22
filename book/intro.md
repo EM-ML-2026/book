@@ -6,8 +6,6 @@ Welcome to the online lecture material for the *Introduction to Machine Learning
 
 Use the sidebar on the left to navigate between sections. Use the links between related pages to your advantage, they provide a consistent thread between the different contents covered in the course and how they are related.
 
-For pages with interactive coding, a **rocket icon** (<i class="fa fa-rocket" aria-hidden="true"></i>) will appear on the top right. Hover it with your cursor and click on <span style="white-space: nowrap;">{guilabel}`Live Code`</span>. Wait a bit while the necessary packages load and the interactive content will then be available.
-
 ## Reading material
 
 Individual book pages can be downloaded as PDF files for offline reading, with the disclaimer that some of the formatting might might be broken as the book was developed and optimized for online use. 
@@ -42,6 +40,5 @@ Slides for this part of the course can be downloaded {download}`here<https://sur
 
 ## Acknowledgements
 
-Support from the TU Delft AI Educational Initiative is gratefully acknowledged. This textbook is a joint effort of the <a href="https://www.tudelft.nl/ai/slimmlab" target="_blank">SLIMM Lab</a> (Statistical Learning for Intelligent Material Modeling) and the <a href="https://www.tudelft.nl/ai/aidrolab" target="_blank">Aidrolab</a> (AI for Sustainable Water Management). 
-
+Support from the TU Delft AI Educational Initiative is gratefully acknowledged. This textbook is a joint effort by the members of the <a href="https://www.tudelft.nl/ai/slimmlab" target="_blank">SLIMM Lab</a> (Statistical Learning for Intelligent Material Modeling).
 

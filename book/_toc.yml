@@ -4,6 +4,12 @@ format: jb-book
 root: intro.md
 
 parts:
+  - caption: Logistics
+    chapters:
+    - file: logistics/starthere.md
+    - file: logistics/slides.md
+    - file: logistics/workshop1.md
+    - file: logistics/workshop2.md
   - caption: Preliminaries 
     chapters:
     - file: preliminaries/firstmodels.md
