@@ -45,7 +45,7 @@ drive.mount('/content/drive', force_remount=True)
 
 # After mounting, you can navigate to a specific folder using the usual UNIX cd command.
 # Replace 'your_folder_path' with the actual path of your folder inside Google Drive.
-folder_path = '/content/drive/MyDrive/cnn_application/'  # Example path
+folder_path = '/content/drive/MyDrive/some_folder/'  # Example path
 
 %cd "$folder_path"
 ```
@@ -88,11 +88,11 @@ To deactivate the conda environment:
 conda deactivate
 ```
 
-## Repository files
+## Workshop repositories
 
-This repository includes two environment configuration files:
+Repositories for the two course workshops may include either:
 
-- `requirements.txt` for a `pip`-based setup
+- `requirements.txt` for a `pip`-based setup; or
 - `environment.yml` for a `conda`-based setup
 
-Use one of them, not both at the same time.
+which you will be required to install.
