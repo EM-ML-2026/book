@@ -15,16 +15,17 @@
 ```
 
 ```{dropdown} Day 2
-| When        | What                                     | Who                               | Slides | 
-| :---------: | :--------------------------------------: | :-------------------------------: | :----: |
-| 9:00~10:20  | Deep neural networks                     | Hongyang Cheng                    | <link> |
-| 10:20~10:40 | Coffee break                             |                                   |        |
-| 10:40~12:00 | Neural operator networks                 | Michael Abdelmalik                | <link> |
-| 12:00~12:30 | Workshop: PINNs vs operator nets I       | Michael Abdelmalik/Hongyang Cheng |        |
-|             |                                          |                                   |        |
-| 12:30~13:30 | Lunch                                    |                                   |        |
-|             |                                          |                                   |        |
-| 13:30~15:15 | Workshop: PINNs vs operator nets II      | Michael Abdelmalik/Hongyang Cheng |        |
-| 15:15~15:35 | Coffee break                             |                                   |        |
-| 15:35~18:00 | ML for atomistic-scale mechanics         | Francesco Maresca                 | <link> |
+| When        | What                                       | Who                               | Slides | 
+| :---------: | :--------------------------------------:   | :-------------------------------: | :----: |
+| 9:00~9:45   | Dimensionality reduction, latent variables | Hongyang Cheng                    | {download}`link<https://surfdrive.surf.nl/s/Wy7mdzWJ3bnn5CM>` |
+| 9:45~10:20  | Physics Informed Neural Networks (PINNs)   | Hongyang Cheng                    | {download}`link<https://surfdrive.surf.nl/s/fNazjpAFfaDnbsQ>` |
+| 10:20~10:40 | Coffee break                               |                                   |        |
+| 10:40~12:00 | Neural operator networks                   | Michael Abdelmalik                | <link> |
+| 12:00~12:30 | Workshop: PINNs vs operator nets I         | Michael Abdelmalik/Hongyang Cheng |        |
+|             |                                            |                                   |        |
+| 12:30~13:30 | Lunch                                      |                                   |        |
+|             |                                            |                                   |        |
+| 13:30~15:15 | Workshop: PINNs vs operator nets II        | Michael Abdelmalik/Hongyang Cheng |        |
+| 15:15~15:35 | Coffee break                               |                                   |        |
+| 15:35~18:00 | ML for atomistic-scale mechanics           | Francesco Maresca                 | <link> |
 ```
