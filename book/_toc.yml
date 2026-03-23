@@ -41,5 +41,6 @@ parts:
     - file: exercises/gp.ipynb
     - file: gp/gp_regression.md
     - file: gp/gp_learning.md
+    - file: gp/bayesopt.md
     - file: exercises-clean/gpr.ipynb
     - file: exercises/gpr.ipynb
