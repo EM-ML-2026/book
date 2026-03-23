@@ -2,6 +2,7 @@
 
 ```{dropdown} Day 1
 | When        | What                                     | Who                      | Slides | 
+| :---------: | :--------------------------------------: | :----------------------: | :----: |
 | 9:00~10:40  | Introduction to ML I                     | Iuri Rocha               | <link> |
 | 10:40~11:00 | Coffee break                             |                          |        |
 | 11:00~12:30 | Introduction to ML II                    | Iuri Rocha               | <link> |
@@ -15,6 +16,7 @@
 
 ```{dropdown} Day 2
 | When        | What                                     | Who                               | Slides | 
+| :---------: | :--------------------------------------: | :-------------------------------: | :----: |
 | 9:00~10:20  | Deep neural networks                     | Hongyang Cheng                    | <link> |
 | 10:20~10:40 | Coffee break                             |                                   |        |
 | 10:40~12:00 | Neural operator networks                 | Michael Abdelmalik                | <link> |
