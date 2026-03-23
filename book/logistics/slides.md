@@ -9,7 +9,7 @@
 |             |                                          |                          |        |
 | 12:30~13:30 | Lunch                                    |                          |        |
 |             |                                          |                          |        |
-| 13:30~14:30 | Basics of computational homogenization   | Ondrej Rokos             | <link> |
+| 13:30~14:30 | ML for computational homogenization      | Ondrej Rokos             | {download}`link<https://surfdrive.surf.nl/s/Gm3Fen5qaHtkJXC>` |
 | 14:30~14:50 | Coffee break                             |                          |        |
 | 14:50~18:00 | Workshop: Constitutive modeling with ML  | Ondrej Rokos/Iuri Rocha  |        |
 ```
