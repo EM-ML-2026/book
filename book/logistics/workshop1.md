@@ -81,3 +81,5 @@ Start in `gp.ipynb` and get acquainted with the code. Try to relate it to what y
 - Set $N=1000$ to use all samples in the dataset. What happens to the speed of your computations? Compare training speed for the same dataset size with the ones in Exercise 2 and investigate how well GPs scale with dataset size. Looking at the code, which operations do you think form a bottleneck in the computation?
 
 ## Exercise 2 — Building neural network-based surrogate models
+
+For this exercise you can find more information and questions directly in the notebook.
