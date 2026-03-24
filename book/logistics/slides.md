@@ -1,6 +1,9 @@
 # Schedule and slides
 
-```{dropdown} Day 1 {link}`(Room HT 1300) <https://use.mazemap.com/#v=1&center=6.860777,52.237575&zoom=20.6&campusid=171&zlevel=13&starttype=identifier&start=HCC107&desttype=identifier&dest=HCT1300>`
+```{dropdown} Day 1
+
+Location: {Room HT 1300}`link<https://use.mazemap.com/#v=1&center=6.860777,52.237575&zoom=20.6&campusid=171&zlevel=13&starttype=identifier&start=HCC107&desttype=identifier&dest=HCT1300>`
+
 | When        | What                                     | Who                      | Slides | 
 | :---------: | :--------------------------------------: | :----------------------: | :----: |
 | 9:00~09:05  | Welcome                                  | Hongyang Cheng           |        |
@@ -15,7 +18,10 @@
 | 14:50~18:00 | Workshop: Constitutive modeling with ML  | Ondrej Rokos/Iuri Rocha  |        |
 ```
 
-```{dropdown} Day 2 {link}`(Room Smart XP Lab) <https://use.mazemap.com/#v=1&center=6.857021,52.239055&zoom=19.5&campusid=171&zlevel=1&starttype=identifier&start=CRB1000VA&desttype=identifier&dest=ZIA138>`
+```{dropdown} Day 2
+
+Location: {Room Smart XP Lab}`link<https://use.mazemap.com/#v=1&center=6.857021,52.239055&zoom=19.5&campusid=171&zlevel=1&starttype=identifier&start=CRB1000VA&desttype=identifier&dest=ZIA138>`
+
 | When        | What                                       | Who                               | Slides | 
 | :---------: | :--------------------------------------:   | :-------------------------------: | :----: |
 | 9:00~9:35   | Dimensionality reduction, latent variables | Hongyang Cheng                    | {download}`link<https://surfdrive.surf.nl/s/Wy7mdzWJ3bnn5CM>` |
