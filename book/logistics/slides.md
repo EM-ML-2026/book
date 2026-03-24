@@ -3,9 +3,9 @@
 ```{dropdown} Day 1
 | When        | What                                     | Who                      | Slides | 
 | :---------: | :--------------------------------------: | :----------------------: | :----: |
-| 9:00~10:40  | Introduction to ML I                     | Iuri Rocha               | <link> |
+| 9:00~10:40  | Introduction to ML I                     | Iuri Rocha               | {download}`link<https://surfdrive.surf.nl/s/6Qc38TZaXkTzatP>` |
 | 10:40~11:00 | Coffee break                             |                          |        |
-| 11:00~12:30 | Introduction to ML II                    | Iuri Rocha               | <link> |
+| 11:00~12:30 | Introduction to ML II                    | Iuri Rocha               | {download}`link<https://surfdrive.surf.nl/s/6Qc38TZaXkTzatP>` |
 |             |                                          |                          |        |
 | 12:30~13:30 | Lunch                                    |                          |        |
 |             |                                          |                          |        |
