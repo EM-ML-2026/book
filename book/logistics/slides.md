@@ -1,8 +1,9 @@
 # Schedule and slides
 
-```{dropdown} Day 1
+```{dropdown} Day 1 {link}`(Room HT 1300) <https://use.mazemap.com/#v=1&center=6.860777,52.237575&zoom=20.6&campusid=171&zlevel=13&starttype=identifier&start=HCC107&desttype=identifier&dest=HCT1300>`
 | When        | What                                     | Who                      | Slides | 
 | :---------: | :--------------------------------------: | :----------------------: | :----: |
+| 9:00~09:05  | Welcome                                  | Hongyang Cheng           |        |
 | 9:00~10:40  | Introduction to ML I                     | Iuri Rocha               | {download}`link<https://surfdrive.surf.nl/s/6Qc38TZaXkTzatP>` |
 | 10:40~11:00 | Coffee break                             |                          |        |
 | 11:00~12:30 | Introduction to ML II                    | Iuri Rocha               | {download}`link<https://surfdrive.surf.nl/s/6Qc38TZaXkTzatP>` |
@@ -14,11 +15,11 @@
 | 14:50~18:00 | Workshop: Constitutive modeling with ML  | Ondrej Rokos/Iuri Rocha  |        |
 ```
 
-```{dropdown} Day 2
+```{dropdown} Day 2 {link}`(Room Smart XP Lab) <https://use.mazemap.com/#v=1&center=6.857021,52.239055&zoom=19.5&campusid=171&zlevel=1&starttype=identifier&start=CRB1000VA&desttype=identifier&dest=ZIA138>`
 | When        | What                                       | Who                               | Slides | 
 | :---------: | :--------------------------------------:   | :-------------------------------: | :----: |
-| 9:00~9:45   | Dimensionality reduction, latent variables | Hongyang Cheng                    | {download}`link<https://surfdrive.surf.nl/s/Wy7mdzWJ3bnn5CM>` |
-| 9:45~10:20  | Physics Informed Neural Networks (PINNs)   | Hongyang Cheng                    | {download}`link<https://surfdrive.surf.nl/s/fNazjpAFfaDnbsQ>` |
+| 9:00~9:35   | Dimensionality reduction, latent variables | Hongyang Cheng                    | {download}`link<https://surfdrive.surf.nl/s/Wy7mdzWJ3bnn5CM>` |
+| 9:35~10:20  | Physics Informed Neural Networks (PINNs)   | Hongyang Cheng                    | {download}`link<https://surfdrive.surf.nl/s/fNazjpAFfaDnbsQ>` |
 | 10:20~10:40 | Coffee break                               |                                   |        |
 | 10:40~12:00 | Neural operator networks                   | Michael Abdelmalik                | <link> |
 | 12:00~12:30 | Workshop: PINNs vs operator nets I         | Michael Abdelmalik/Hongyang Cheng |        |
