@@ -8,7 +8,7 @@ $$(empiricalbayeskernel)
 
 Given that our choice of kernel is fixed, the model selection problem becomes one of determining suitable values for hyperparameters $\sigma_f$, $\ell$ and the noise $\beta$.
 
-In {doc}`../../2-bayesregression/lectures/model_selection`, we did the same for weight-space models by marginalizing $\bw$ to obtain an expression for $p(\mbf{t})$, the **marginal likelihood**, or **evidence** function. We then used *Empirical Bayes* to compute $\alpha$ and $\beta$ that maximized this evidence.
+In {doc}`../bayesian/model_selection`, we did the same for weight-space models by marginalizing $\bw$ to obtain an expression for $p(\mbf{t})$, the **marginal likelihood**, or **evidence** function. We then used *Empirical Bayes* to compute $\alpha$ and $\beta$ that maximized this evidence.
 
 For GPs the operation is exactly the same, but getting to the evidence is much easier now. Recall from Eq. {eq}`gprjoint` that we already have an expression for $p(\mbf{t})$:
 

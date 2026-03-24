@@ -31,7 +31,7 @@ If you are interested in the exact derivation of going from $\bw$ to $\mbf{y}$, 
 {bdg-danger}`bishop-prml`     
 ```
 
-We have actually already seen an example of this before when looking at {doc}`../../2-bayesregression/lectures/active_learning`. For a set of radial basis functions and sampling from the prior over $\bw$ we got the following samples:
+We have actually already seen an example of this before when looking at {doc}`../bayesian/active_learning`. For a set of radial basis functions and sampling from the prior over $\bw$ we got the following samples:
 
 ```{figure} ../figures/equivalentkernels0.svg
 :width: 500px

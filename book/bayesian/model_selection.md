@@ -2,7 +2,7 @@
 
 Up until now we have been assuming values for our hyperparameters $\alpha$ and $\beta$. Recall that the MAP solution is equivalent to an MLE model with $L_2$ regularization term $\lambda={\alpha}/{\beta}$, which suggests that $\alpha$ and $\beta$ control the flexibility of our model.
 
-In an MLE approach, simply minimizing the loss function for $\alpha$ and $\beta$ would always result in the most flexible model possible, which is however prone to overfitting. In {doc}`frequentist model selection<../../1-regression/decision_theory_interactive>` we solve this dilemma by keeping some data aside as **validation dataset** and adopting the regularization parameter that miminizes the validation loss.
+In an MLE approach, simply minimizing the loss function for $\alpha$ and $\beta$ would always result in the most flexible model possible, which is however prone to overfitting. In {doc}`frequentist model selection<../frequentist/decision_theory>` we solve this dilemma by keeping some data aside as **validation dataset** and adopting the regularization parameter that miminizes the validation loss.
 
 Bayesian models on the other hand tend to be more resistant to overfitting, and there is in principle no need to hold out some data when calibrating hyperparameters, as we will see in this page. We first set up this **model selection** problem in a probabilistic way.
 
