@@ -1,5 +1,48 @@
 # Day 2 workshop
 
+## ML for solving partial differential equations
+
+In this workshop you will:
+
+1. Learn how to use physics-informed neural networks and neural operators to solve simple PDEs.
+2. Learn to change boundary conditions and PDE coefficients.
+3. Learn to benchmark solutions from PINNs and Neural Green’s Operators.
+
+You will work in pairs to test and compare the performance of two different machine learning approaches for the solving Poisson equation: Physics-Informed Neural Networks (PINNs) and Neural Green's Operators (NGOs). The goal is to understand the strengths and weaknesses of each method in terms of accuracy, generalization, and computational efficiency.
+
+## Preparations
+
+If working locally, clone the [simple-pinns](https://github.com/EM-ML-2026/simple-pinns) and [ngo](https://github.com/EM-ML-2026/ngo) repositories. Then navigate to the cloned folder and resolve the virtual environment as follows:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+If you would like to work on Google Colab, add a code block at the top of the notebook with:
+
+PINN:
+
+```python
+!git clone https://github.com/EM-ML-2026/simple-pinns.git
+%cd simple-pinns
+!pip install -r requirements.txt
+!python 02_2d_steady_poisson.py
+```
+
+NGO:
+
+```python
+!git clone https://github.com/EM-ML-2026/ngo.git
+%cd ngo
+!pip install -r requirements.txt
+!pip install -e .
+%run examples/steadydiffusion.ipynb
+```
+
+Make sure your IDE (e.g VS Code) is using the correct environment. Then load the scripts and get to work!
+
 ## Benchmark Problems: PINN vs. Neural Green's Operator (NGO)
 
 Both benchmarks concern the steady diffusion equation on the unit square:
