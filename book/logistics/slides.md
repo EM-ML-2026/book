@@ -36,3 +36,6 @@ Location: [Room Smart XP Lab](https://link.mazemap.com/qSTKj4SS)
 | 15:15~15:35 | Coffee break                               |                                   |        |
 | 15:35~18:00 | ML for atomistic-scale mechanics           | Francesco Maresca                 | <link> |
 ```
+
+Please do not forget to fill in the evaluation form.
+[Evaluation Machine Learning – Graduate School on Engineering Mechanics](https://engineeringmechanicsnl.wpcomstaging.com/evaluation/)
