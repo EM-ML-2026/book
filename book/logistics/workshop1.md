@@ -20,7 +20,8 @@ If you would like to work on Google Colab, download the [GP](https://github.com/
 %cd hyperelasticity
 ```
 
-and that is it! Or just use [this pre-made Colab notebook](https://colab.research.google.com/drive/17VeTX0Xcjj8vXXDo3NUOS0NYq0acyyQC?usp=sharing):
+and that is it! Or just use [this pre-made Colab notebook](https://colab.research.google.com/drive/17VeTX0Xcjj8vXXDo3NUOS0NYq0acyyQC?usp=sharing) for the GP part and [this one](https://colab.research.google.com/drive/1wvSporGYWIgLC8FYAicSXCuhtg76a_he?usp=sharing) for the NN part.
+%cd hyperelasticity:
 
 If working locally, first clone the workshop repository:
 
