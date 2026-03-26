@@ -34,7 +34,7 @@ Location: [Room Smart XP Lab](https://link.mazemap.com/qSTKj4SS)
 |             |                                            |                                   |        |
 | 13:30~15:15 | Workshop: PINNs vs operator nets II        | Michael Abdelmalik/Hongyang Cheng |        |
 | 15:15~15:35 | Coffee break                               |                                   |        |
-| 15:35~18:00 | ML for atomistic-scale mechanics           | Francesco Maresca                 | <link> |
+| 15:35~18:00 | ML for atomistic-scale mechanics           | Francesco Maresca                 | {download}`link<https://surfdrive.surf.nl/s/w6kPkiN7q6ryiPK>` |
 ```
 
 We would like to hear your feedback, so that we can keep improving this course. Please do not forget to fill in the evaluation form via the link below:
